@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ if .IsHome }}{{ site.Title }}{{ else }}{{ .Title }} · {{ site.Title }}{{ end }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="{{ .Description | default site.Params.description }}">
+    {{- if eq .Kind "404" }}
+    <meta name="robots" content="noindex">
+    {{- else }}
+    {{- /* uglyURLs makes terms.html and index.html, but Cloudflare serves it at /terms and redirects /terms.html there; the home page is /. */}}
+    {{- $url := cond .IsHome site.BaseURL (strings.TrimSuffix ".html" .Permalink) }}
+    <link rel="canonical" href="{{ $url }}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="{{ site.Title }}">
+    <meta property="og:title" content="{{ .Title }}">
+    <meta property="og:description" content="{{ .Description | default site.Params.description }}">
+    <meta property="og:url" content="{{ $url }}">
+    {{- end }}
+    <meta name="color-scheme" content="light">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/style.css">
+    {{ block "head" . }}{{ end }}
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="wrap">
+        <a class="brand" href="https://dummthings.dev/">{{ site.Params.company }}</a>
+        <nav>
+          <a href="https://dummthings.dev/#projects">Projects</a>
+          <a href="https://dummthings.dev/#contact">Contact</a>
+        </nav>
+      </div>
+    </header>
+    {{ block "main" . }}{{ end }}
+    <footer class="wrap footer">
+      <p>&copy; {{ now.Year }} {{ site.Params.company }} &middot; {{ site.Params.location }} &middot; <a href="mailto:{{ site.Params.email }}">{{ site.Params.email }}</a></p>
+      <p><a href="https://dummthings.dev/terms">Terms</a> &middot; <a href="https://dummthings.dev/privacy">Privacy</a></p>
+    </footer>
+  </body>
+</html>

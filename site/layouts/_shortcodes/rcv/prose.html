@@ -1,0 +1,3 @@
+<section class="prose"{{ with .Get "id" }} id="{{ . }}"{{ end }}>
+{{ .InnerDeindent | .Page.RenderString (dict "display" "block") }}
+</section>

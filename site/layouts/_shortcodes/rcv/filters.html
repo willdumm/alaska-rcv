@@ -1,0 +1,7 @@
+{{- /* The contest and district pickers, which stick to the top of the page, and the line saying what's selected. */ -}}
+<form class="rcv-filters" id="rcv-filters" aria-label="Choose which ballots to count">
+<label>{{ .Get "contest" | default "Contest" }} <select id="f-contest"></select></label>
+<label>{{ .Get "district" | default "District" }} <select id="f-hd"></select></label>
+<p id="rcv-district-warning" class="rcv-district-warning" role="status" hidden></p>
+</form>
+<p class="rcv-scope muted rcv-small" id="rcv-scope" aria-live="polite"></p>

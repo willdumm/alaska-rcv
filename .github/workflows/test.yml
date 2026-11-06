@@ -1,0 +1,36 @@
+# Runs on what's committed: no raw CVR, which is 1.5 GB. validate_2024.mjs and compare_rctab.mjs need that, so they run locally.
+name: test
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ijson==3.3.0
+      - name: Unit and fixture tests
+        run: npm test
+      - name: Vote total checks on the committed data
+        run: node scripts/check_counts.mjs site/static/data/alaska-rcv-2026
+      - name: The simulation reproduces its committed file
+        run: bash scripts/refresh.sh reproduce site/static/data/alaska-rcv-2026
+      - uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: "0.167.0"
+          extended: true
+      - run: hugo --source site --cleanDestinationDir --quiet
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Every contest in a browser
+        run: npm run smoke

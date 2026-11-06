@@ -1,0 +1,12 @@
+{{- /* Hugo's sitemap, with the URLs Cloudflare serves (/terms, not /terms.html; / for the home page). */ -}}
+{{ printf "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>" | safeHTML }}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  {{- range where .Pages "Sitemap.Disable" "ne" true }}
+  <url>
+    <loc>{{ cond .IsHome site.BaseURL (strings.TrimSuffix ".html" .Permalink) }}</loc>
+    {{- if not .Lastmod.IsZero }}
+    <lastmod>{{ .Lastmod.Format "2006-01-02" }}</lastmod>
+    {{- end }}
+  </url>
+  {{- end }}
+</urlset>

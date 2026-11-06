@@ -1,0 +1,7 @@
+.wrangler
+node_modules
+.dev.vars
+# Hugo build output (source is in site/)
+public
+site/.hugo_build.lock
+.env

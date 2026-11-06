@@ -1,0 +1,17 @@
+baseURL = "https://alaska-rcv.dummthings.dev/"
+title = "Alaska 2026 ranked-choice explorer"
+locale = "en-us"
+# Built into ../public, which wrangler serves as static assets (see wrangler.jsonc).
+publishDir = "../public"
+uglyURLs = true
+disableKinds = ["taxonomy", "term", "RSS"]
+
+# The page's shortcodes nest, so markdown has to pass their HTML through.
+[markup.goldmark.renderer]
+unsafe = true
+
+[params]
+company = "Dumm Software LLC"
+email = "will@dummthings.dev"
+location = "Seattle, WA"
+description = "An unofficial, preliminary look at Alaska's 2026 general election, re-running the ranked-choice count from the Division of Elections' cast vote record."

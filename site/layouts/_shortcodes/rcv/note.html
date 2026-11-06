@@ -1,0 +1,2 @@
+{{- /* Small print. muted=false for darker text, id if rcv.js needs to find it, hidden=true if rcv.js decides when it shows. */ -}}
+<p{{ with .Get "id" }} id="{{ . }}"{{ end }} class="{{ if ne (.Get "muted") false }}muted {{ end }}rcv-small"{{ if .Get "hidden" }} hidden{{ end }}>{{ .InnerDeindent | strings.TrimSpace | .Page.RenderString }}</p>

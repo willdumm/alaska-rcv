@@ -1,0 +1,11 @@
+{{ define "head" }}
+<script src="/d3-7.9.0.min.js"></script>
+{{ end }}
+
+{{ define "main" }}
+<main class="wrap rcv">
+  {{ .Content }}
+</main>
+<div id="rcv-tip" class="rcv-tip" hidden></div>
+<script type="module" src="/rcv.js" onerror="document.getElementById('rcv-updated').textContent = 'This page failed to load. Please reload.'"></script>
+{{ end }}

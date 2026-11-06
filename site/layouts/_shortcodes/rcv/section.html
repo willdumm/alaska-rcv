@@ -1,0 +1,6 @@
+{{- /* A titled section. The body is markdown and other rcv shortcodes: leave a blank line between them and don't indent them. tag says what kind of numbers it holds. */ -}}
+<section id="{{ .Get "id" }}" class="rcv-section{{ with .Get "class" }} {{ . }}{{ end }}" aria-labelledby="{{ .Get "id" }}-title">
+{{ with .Get "tag" }}<p class="rcv-tag">{{ . }}</p>{{ end }}
+<h2 id="{{ .Get "id" }}-title">{{ .Get "title" }}</h2>
+{{ .InnerDeindent | .Page.RenderString (dict "display" "block") }}
+</section>

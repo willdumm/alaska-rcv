@@ -1,0 +1,5 @@
+{{- /* A collapsible block. Its summary is a param and its body is markdown and other rcv shortcodes. */ -}}
+<details{{ with .Get "id" }} id="{{ . }}"{{ end }} class="{{ .Get "class" | default "rcv-details" }}"{{ if .Get "open" }} open{{ end }}>
+<summary>{{ .Get "summary" }}</summary>
+{{ .InnerDeindent | .Page.RenderString (dict "display" "block") }}
+</details>

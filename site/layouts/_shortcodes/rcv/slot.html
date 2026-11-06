@@ -1,0 +1,2 @@
+{{- /* An empty element for rcv.js to draw into, found by its id. */ -}}
+{{ if eq (.Get "tag") "ul" }}<ul id="{{ .Get "id" }}"{{ with .Get "class" }} class="{{ . }}"{{ end }}></ul>{{ else }}<div id="{{ .Get "id" }}"{{ with .Get "class" }} class="{{ . }}"{{ end }}></div>{{ end }}
