@@ -8,7 +8,8 @@ SUMMARY.txt is the summary PDF as `pdftotext -layout` text, which has the report
 write-in totals. SUMMARY.csv is the per-precinct summary. BALLOTS_JSON is extract_cvr.py's
 ballots.json. RECEIVED_JSON holds the "ballots received" table from the results page, by hand:
 {"asOf": "...", "received": n, "issued": n}. RECEIVED_TABLE is that page as saved, which gives the
-questioned row, and has to agree with RECEIVED_JSON's total. CVR_LAST_MODIFIED is the CVR file's
+questioned row, and has to agree with RECEIVED_JSON's total. Only a snapshot with no saved table
+sets "questioned" and "questionedNote" in RECEIVED_JSON instead. CVR_LAST_MODIFIED is the CVR file's
 Last-Modified header, FETCHED the time we downloaded it, both as ISO 8601.
 """
 import collections
@@ -121,7 +122,8 @@ def main(report_path, csv_path, ballots_path, received_path, table_path, cvr_mod
         cvr = json.load(f)
     with open(received_path, encoding="utf-8") as f:
         received = json.load(f)
-    received["questioned"] = questioned_received(table_path, received["received"])
+    if "questioned" not in received:
+        received["questioned"] = questioned_received(table_path, received["received"])
 
     # Every CVR ballot has one row in "measures": district, counting group, BM2, BM3, count.
     by_district = collections.defaultdict(collections.Counter)

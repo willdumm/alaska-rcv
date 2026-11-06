@@ -11,8 +11,10 @@ import { renderProjection } from "./rcv-projection.js";
 import { drawMap, paintMap, renderCoverage, renderDots, renderMapLegend, renderMapMode, setLastShares, windAllRings } from "./rcv-districts.js";
 import { actions, currentContest, state } from "./rcv-state.js";
 import { chamberContest, chamberLabel, isChamber, renderChamber } from "./rcv-seats.js";
+import { chooseVersion, renderVersions } from "./rcv-versions.js";
 
-const DATA = "/data/alaska-rcv-2026/";
+let dataDir;
+let earlierVersion = null;
 const contests = new Map();
 let updatedText;
 let measures;
@@ -20,7 +22,7 @@ let measures;
 // Data
 
 async function json(name) {
-  const response = await fetch(DATA + name);
+  const response = await fetch(dataDir + name);
   if (!response.ok) throw new Error(`${name}: ${response.status}`);
   return response.json();
 }
@@ -299,6 +301,7 @@ function readURL() {
 
 function writeURL() {
   const q = new URLSearchParams();
+  if (earlierVersion) q.set("version", earlierVersion.id);
   if (state.contest !== defaultContest()) q.set("contest", state.contest);
   if (state.hd !== "all") q.set("hd", state.hd);
   const text = q.toString();
@@ -316,7 +319,7 @@ function renderDistrictWarning() {
 }
 
 function scopeText(c) {
-  return `${c.name}, ${state.hd === "all" ? "all districts" : districtName(state.hd)}. Preliminary and unofficial, results as of ${updatedText}.`;
+  return `${earlierVersion ? "Earlier version. " : ""}${c.name}, ${state.hd === "all" ? "all districts" : districtName(state.hd)}. Preliminary and unofficial, results as of ${updatedText}.`;
 }
 
 // Says so on the page, rather than leaving a half-drawn page that could be read as results.
@@ -374,6 +377,9 @@ async function draw() {
 }
 
 async function main() {
+  const version = await chooseVersion(new URLSearchParams(location.search).get("version"));
+  dataDir = version.dir;
+  earlierVersion = version.earlier;
   try {
     if (typeof d3 === "undefined") throw new Error("the chart library didn't load");
     const [ballotsFile, coverageFile, districtsFile, namesFile, earlyAbsentee, questioned, projectionFile] = await Promise.all([json("ballots.json"), json("coverage.json"), json("districts.geojson"), json("district-names.json"), json("early-absentee-2024.json"), json("questioned-2024.json"), json("projection.json")]);
@@ -384,6 +390,7 @@ async function main() {
     $("rcv-updated-detail").textContent = `The election data didn't load (${error.message}). Please try reloading.`;
     return;
   }
+  renderVersions(version);
   actions.render = render;
   actions.selectDistrict = selectDistrict;
   actions.selectContest = selectContest;

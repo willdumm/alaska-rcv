@@ -82,6 +82,57 @@ const BROKEN = [
   ["a contest doesn't load", /contest-6\.json/],
 ];
 const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+
+// Each version draws from its own data and says what it is, in a whole race and a whole chamber. The latest says nothing extra.
+const { versions } = JSON.parse(readFileSync(join(root, "data/alaska-rcv-2026/versions.json"), "utf8"));
+for (const [i, version] of versions.entries()) {
+  const dir = i === 0 ? "data/alaska-rcv-2026/" : `data/alaska-rcv-2026/versions/${version.id}/`;
+  const { report } = JSON.parse(readFileSync(join(root, dir, "coverage.json"), "utf8"));
+  for (const contest of ["6", "house"]) {
+    const { page, errors } = await opened(context, `${base}?contest=${contest}&version=${version.id}`);
+    const seen = await page.evaluate(() => ({
+      picked: document.getElementById("f-version").value,
+      options: document.querySelectorAll("#f-version option").length,
+      warning: !document.getElementById("rcv-version-warning").hidden,
+      note: document.getElementById("rcv-version-note").textContent,
+      detail: document.getElementById("rcv-updated-detail").textContent,
+      overflow: document.documentElement.scrollWidth - innerWidth,
+    }));
+    const fail = (what) => problems.push(`version ${version.id} contest ${contest}: ${what}`);
+    if (errors.length) fail(`errors: ${errors.join("; ")}`);
+    if (seen.picked !== version.id) fail(`the picker says ${seen.picked}`);
+    if (seen.options !== versions.length) fail(`${seen.options} versions in the picker`);
+    if (seen.warning !== (i > 0)) fail(seen.warning ? "the latest says it's earlier" : "doesn't say it's earlier");
+    if (i > 0 && !/isn't what this page showed that day/.test(seen.note)) fail("doesn't say it's today's model");
+    if (i === 0 && seen.note) fail(`the latest has a note: ${seen.note}`);
+    if (!seen.detail.includes(report.votersCast.toLocaleString("en-US"))) fail("the status isn't this version's");
+    if (seen.overflow > 0) fail(`page scrolls sideways by ${seen.overflow}px`);
+    await page.close();
+  }
+}
+if (versions.length > 1) {
+  const { page } = await opened(context, `${base}?contest=house`);
+  await Promise.all([page.waitForURL(/version=/, { waitUntil: "networkidle" }), page.selectOption("#f-version", versions[1].id)]);
+  if (!page.url().includes("contest=house")) problems.push("choosing a version loses the contest");
+  await Promise.all([page.waitForURL((url) => !url.search.includes("version="), { waitUntil: "networkidle" }), page.click("#rcv-version-warning button")]);
+  if (await page.locator("#rcv-version-warning").isVisible()) problems.push("back to the latest still says earlier");
+  await page.close();
+}
+{
+  const { page } = await opened(context, `${base}?version=nonsense`);
+  const note = await page.locator("#rcv-version-note").textContent();
+  if (!/wasn't found/.test(note)) problems.push("an unknown version doesn't say so");
+  await page.close();
+}
+await context.route(/versions\.json/, (route) => route.abort());
+{
+  const { page, errors } = await opened(context, base);
+  if (errors.length || !await page.locator("#rcv-map path.district").count()) problems.push("the page needs versions.json to draw");
+  if (await page.locator("#rcv-version-picker").isVisible()) problems.push("an empty version picker");
+  await page.close();
+}
+await context.unroute(/versions\.json/);
+
 for (const [what, pattern] of BROKEN) {
   await context.route(pattern, (route) => route.abort());
   const { page } = await opened(context, base);
@@ -208,5 +259,5 @@ await browser.close();
 server.close();
 
 problems.slice(0, 40).forEach((p) => console.log(p));
-console.log(`${ids.length} contests at ${WIDTHS.length} widths, ${BROKEN.length + 1} failures simulated, ${problems.length} problems`);
+console.log(`${ids.length} contests at ${WIDTHS.length} widths, ${versions.length} versions, ${BROKEN.length + 1} failures simulated, ${problems.length} problems`);
 process.exit(problems.length ? 1 : 0);

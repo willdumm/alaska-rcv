@@ -8,16 +8,20 @@ of this repo. Git holds only the prepared data. `sources.sha256` has the checksu
 | --- | --- |
 | `cvr-2026-11-04T114246Z` | CVR, summary PDF, precinct CSV and `received.json`. Only the CVR's response headers were saved |
 | `sources-2026-11-05` | The CVR posted 2026-11-05T00:24:43Z, with the same files, all three files' response headers and the saved ballots received table. Also the 2024 CVR, the 9 certified round-by-round reports, summary and precinct CSV, for `validate_2024.mjs`, `calibrate_lean_2024.mjs` and the `build_*_2024.mjs` scripts. Also `districts.js` and the Census outline used by `build_districts.mjs` and `build_coast_clip.sh`, and the Division's form [H07](https://www.elections.alaska.gov/doc/forms/H07.pdf) (rev. 05/24/2022) used by `build_district_names.mjs` |
+| `snapshot-2026-11-05T231900Z` | The same CVR, summary and precinct CSV as `sources-2026-11-05`, with the received table updated November 5 at 2:19 PM Alaska time, `received.json` made from it, and all four files' response headers |
 
-A `cvr-` release's name is the CVR's `Last-Modified` time, UTC, and later refreshes each get one. The November 5 CVR's ballots match the
-November 4 CVR's, so only `coverage.json` and `projection.json` differed between them. The data in this repo is built from
-`sources-2026-11-05`, and the data built from the November 4 snapshot isn't in it.
+Each later update gets a `snapshot-` release, named for its version: the Division's latest change, UTC, to the CVR, the summary or
+the received table. So a release can hold the same CVR as the one before it, with a newer table.
+
+The data in this repo's `versions/` directories is built from these, all with the current code.
 
 On November 4, 2026, when these were archived, each snapshot's summary, precinct CSV, `received.json`
 and times rebuilt its `coverage.json` byte for byte. Neither CVR was re-extracted then.
 
-The build now also reads the questioned row from the saved ballots received table, so only snapshots with that table can be
-rebuilt, and `coverage.json` gains that row. The release's `received.json` stays as it was archived.
+The build now also reads the questioned row from the saved ballots received table, and `coverage.json` gains that row. The release's
+`received.json` stays as it was archived. `cvr-2026-11-04T114246Z` has no table, so its version is built with
+`scripts/received-2026-11-04.json` in place of its `received.json`, which adds the questioned count from a day later (143). The page
+says so on that version. That moves at most those 143 ballots between the uncounted and questioned estimates.
 
 To fetch and check a release, treating its files as untrusted input (see `scripts/README.md`):
 

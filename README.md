@@ -14,7 +14,8 @@ This project is heavily AI agent assisted: Claude Code wrote much of the code an
   scripts, so the two can't drift. `rcv-projected.js` projects rounds from the summary and the CVR, and `rcv-model.js` has the
   page's numbers, with no DOM or d3.
 - `site/static/d3-7.9.0.min.js`: d3, self-hosted.
-- `site/static/data/alaska-rcv-2026/`: the prepared data, rebuilt at each refresh.
+- `site/static/data/alaska-rcv-2026/`: the prepared data, rebuilt at each refresh. `versions/` holds one complete copy per update
+  from the Division, listed in `versions.json`, and `rcv-versions.js` is the page's picker for them.
 - `docs/RULES.md`: the rules the count applies, and how they were checked, including against RCTab.
 - `scripts/README.md`: how to refresh the data, the checks, and deferred ideas. `scripts/refresh.sh` runs the refresh and the
   pre-deploy check.

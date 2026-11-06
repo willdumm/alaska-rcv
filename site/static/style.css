@@ -78,6 +78,10 @@ main > section#rcv-about { padding: 8px 0 12px; border-top: 0; }
 #rcv-about ul { margin: 0; }
 #rcv-about li { margin-bottom: 2px; }
 .rcv-status p { margin: 0; }
+.rcv-status .rcv-version-picker { margin-top: 8px; }
+.rcv-version-picker label { display: flex; flex-direction: column; max-width: 760px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.rcv-version-picker select { width: 100%; min-height: 38px; padding: 4px 8px; border: 1px solid #c7ccd2; border-radius: 6px; background: var(--bg); color: var(--text); font: 400 15px var(--font); }
+.rcv-status #rcv-version-note { margin-top: 6px; }
 .rcv-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 24px; margin: 8px 0; }
 .rcv-tiles div { min-width: 0; }
 .rcv-tiles dt { font-size: 14px; line-height: 1.4; color: var(--muted); }

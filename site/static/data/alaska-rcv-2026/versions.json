@@ -1,0 +1,23 @@
+{
+ "versions": [
+  {
+   "id": "2026-11-05T231900Z",
+   "time": "2026-11-05T23:19:00Z",
+   "counted": 215912,
+   "received": 113322
+  },
+  {
+   "id": "2026-11-05T002443Z",
+   "time": "2026-11-05T00:24:43Z",
+   "counted": 215912,
+   "received": 110404
+  },
+  {
+   "id": "2026-11-04T114246Z",
+   "time": "2026-11-04T11:42:46Z",
+   "counted": 215341,
+   "received": 105419,
+   "note": "The Division's table wasn't saved that day, so its count of questioned ballots received comes from a day later (143, on Nov 4)."
+  }
+ ]
+}

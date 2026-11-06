@@ -7,6 +7,26 @@ The Division's files are untrusted input: keep them in their own directory, and 
 `elections.alaska.gov` sends the wrong TLS intermediate. Browsers cope, but curl needs the right one
 passed with `--cacert`, found through the certificate's AIA URL. Don't turn verification off.
 
+## Watching for updates
+
+The Division overwrites its files at the same URLs, so a missed update is gone. `bash scripts/refresh.sh watch STORE CACERT`, run about
+hourly, compares the three files' `Last-Modified` and the table's "Table last updated" text with the last run's, and saves a complete
+snapshot to `STORE/TIME/` when any has changed. It writes nothing to this repo and publishes nothing. A file posted during a
+download shows up as a change next run, so that run's snapshot is the complete one: build the newest for each posting.
+
+## Earlier versions
+
+The page has one version per update from the Division: a complete data directory at `site/static/data/alaska-rcv-2026/versions/ID/`,
+where `ID` is the time of the Division's latest change to its CVR, summary or received table. `versions.json` lists them, and the
+page's default data is a copy of the newest. Every version runs today's model on that day's data, so it isn't what the page showed that
+day, and the page says so. Don't rebuild one from an old commit: old commits mix changes to the model with changes to the data.
+
+`npm test` checks the list and the copies, and CI reruns every version's simulation. If that fails after a change to the model,
+rerun each version's `simulate_projection.mjs`. If the data's format changed, rebuild each version from its release:
+`refresh.sh build` into a directory holding copies of `district-names.json`, `districts.geojson`, `early-absentee-2024.json`,
+`holdovers.json` and `questioned-2024.json`, then `refresh.sh keep THAT_DIR site/static/data/alaska-rcv-2026`.
+Rebuild the newest last, in the data directory itself.
+
 ## Refreshing results
 
 Each refresh changes the page's status line, which comes from these files. `refresh.sh` does what can be scripted,
@@ -17,12 +37,12 @@ which `PYTHON` can point to:
 nix shell nixpkgs#nodejs nixpkgs#poppler-utils nixpkgs#unzip -c bash
 ```
 
-1. `bash scripts/refresh.sh fetch RAW_DIR CACERT` downloads `CVR_Export.zip`, `ElectionSummaryReportRPT.pdf` and
-   `GA_ENR_Precinct_State_of_Alaska.csv` from `https://www.elections.alaska.gov/enr/26GENR/results/`, with their response
-   headers. `RAW_DIR` must be a directory of its own, outside this repo.
-2. By hand, write `RAW_DIR/received.json` from the "ballots received" table on
-   https://www.elections.alaska.gov/election-results/e/, and save the table to `RAW_DIR/ballots-received-table.html`:
-   `{"asOf": "Nov 3, 2026, 12:26 PM", "received": 105419, "issued": 126521}`.
+1. Copy a snapshot from the watcher to its own directory outside this repo, as `RAW_DIR`. Or `bash scripts/refresh.sh fetch RAW_DIR CACERT`
+   downloads `CVR_Export.zip`, `ElectionSummaryReportRPT.pdf` and `GA_ENR_Precinct_State_of_Alaska.csv` from
+   `https://www.elections.alaska.gov/enr/26GENR/results/`, and the "ballots received" table from
+   https://www.elections.alaska.gov/election-results/e/, with their response headers.
+2. `build` writes `RAW_DIR/received.json` from the saved table with `received_from_table.mjs`, unless it's already there:
+   `{"asOf": "Nov 3, 2026, 12:26 PM", "received": 105419, "issued": 126521}`. It stops if the table's rows don't add up to its total.
    That total includes the table's questioned ballots (143 on November 4) and special needs ballots (286). `build_coverage.py`
    reads the questioned row from the saved table, stops if the table's total differs from `received.json`'s, and records the row
    in `coverage.json`. Uncounted ballots leave it out, because the questioned estimate already covers those ballots.
@@ -33,10 +53,11 @@ nix shell nixpkgs#nodejs nixpkgs#poppler-utils nixpkgs#unzip -c bash
    adds whatever is left of each district's expected count; revisit that then.
 4. By hand, reread the caveats in `site/content/_index.md`: they may go out of date.
 5. By hand, once the Division publishes round-by-round reports on November 18, compare them and say so on the page.
-6. `bash scripts/refresh.sh archive RAW_DIR` adds the raw files' checksums to `../sources.sha256`, since the Division overwrites
+6. `bash scripts/refresh.sh keep site/static/data/alaska-rcv-2026 site/static/data/alaska-rcv-2026` keeps this build as a version, and
+   rewrites `versions.json`. Then `bash scripts/refresh.sh archive RAW_DIR site/static/data/alaska-rcv-2026` adds the raw files' checksums to `../sources.sha256`, since the Division overwrites
    them, and prints the `gh release create` command. Add a row to `../SOURCES.md` by hand.
 7. Before deploying, `bash scripts/refresh.sh check site/static/data/alaska-rcv-2026 CACERT` runs the tests, the vote total
-   checks and the simulation again, and fails unless the Division's latest CVR is the one in `coverage.json`.
+   checks and the simulation again, and fails unless the Division's latest CVR and received table are the ones in `coverage.json`.
 
 Once per election, `node build_early_absentee_2024.mjs EXTRACTED_2024_DIR site/static/data/alaska-rcv-2026/early-absentee-2024.json`
 makes the 2024 shares that split the uncounted ballots between districts, and

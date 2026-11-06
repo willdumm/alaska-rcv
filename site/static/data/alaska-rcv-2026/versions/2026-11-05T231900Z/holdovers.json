@@ -1,0 +1,104 @@
+{
+ "senate": [
+  {
+   "seat": "B",
+   "hds": [
+    3,
+    4
+   ],
+   "name": "Kiehl, Jesse",
+   "party": "Registered Democrat",
+   "until": "January 2029"
+  },
+  {
+   "seat": "D",
+   "hds": [
+    7,
+    8
+   ],
+   "name": "Bjorkman, Jesse J.",
+   "party": "Registered Republican",
+   "until": "January 2029"
+  },
+  {
+   "seat": "F",
+   "hds": [
+    11,
+    12
+   ],
+   "name": "Kaufman, James D.",
+   "party": "Registered Republican",
+   "until": "January 2029"
+  },
+  {
+   "seat": "H",
+   "hds": [
+    15,
+    16
+   ],
+   "name": "Claman, Matt",
+   "party": "Registered Democrat",
+   "until": "January 2029"
+  },
+  {
+   "seat": "J",
+   "hds": [
+    19,
+    20
+   ],
+   "name": "Dunbar, Forrest",
+   "party": "Registered Democrat",
+   "until": "January 2029"
+  },
+  {
+   "seat": "L",
+   "hds": [
+    23,
+    24
+   ],
+   "name": "Merrick, Kelly R.",
+   "party": "Registered Republican",
+   "until": "January 2029"
+  },
+  {
+   "seat": "N",
+   "hds": [
+    27,
+    28
+   ],
+   "name": "Yundt, Robert",
+   "party": "Registered Republican",
+   "until": "January 2029"
+  },
+  {
+   "seat": "P",
+   "hds": [
+    31,
+    32
+   ],
+   "name": "Kawasaki, Scott",
+   "party": "Registered Democrat",
+   "until": "January 2029"
+  },
+  {
+   "seat": "R",
+   "hds": [
+    35,
+    36
+   ],
+   "name": "Cronk, Mike",
+   "party": "Registered Republican",
+   "until": "January 2029"
+  },
+  {
+   "seat": "T",
+   "hds": [
+    39,
+    40
+   ],
+   "name": "Olson, Donald C. \"Donny\"",
+   "party": "Registered Democrat",
+   "until": "January 2029"
+  }
+ ]
+}

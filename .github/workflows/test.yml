@@ -25,6 +25,8 @@ jobs:
         run: node scripts/check_counts.mjs site/static/data/alaska-rcv-2026
       - name: The simulation reproduces its committed file
         run: bash scripts/refresh.sh reproduce site/static/data/alaska-rcv-2026
+      - name: The same for every earlier version
+        run: bash scripts/refresh.sh versions site/static/data/alaska-rcv-2026
       - uses: peaceiris/actions-hugo@v3
         with:
           hugo-version: "0.167.0"
