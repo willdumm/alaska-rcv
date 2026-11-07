@@ -92,7 +92,7 @@ function renderCount(c, hd) {
 // Only a race with three or more candidates has rounds to project: otherwise this is the Division's summary as it stands.
 function renderCountText(c) {
   const ranked = c.letters.length > 2;
-  const notHere = "The simulations below add the ballots not yet counted, so they can name a different leader.";
+  const notHere = "The simulations in the next section account for ballots not yet counted, so their winning candidates may not match current tabulation results here.";
   const intro = c.measure ? `The Division's results. ${notHere}`
     : c.letters.length === 1 ? "The Division's first choices, without write-ins. This contest has one candidate, so there are no rounds to run."
     : !ranked ? `The Division's first choices, without write-ins. With two candidates, no one is eliminated, so there's one round. ${notHere}`
@@ -100,7 +100,7 @@ function renderCountText(c) {
   $("rcv-count-intro").replaceChildren(el("p", {}, intro));
   $("count-title").textContent = ranked ? "Ranked choice tabulation, for ballots counted so far" : "The count so far";
   document.querySelector("#count .rcv-tag").textContent = ranked ? "Projected from the Division's results" : "Division's results";
-  $("rcv-projection-intro").replaceChildren(...(c.letters.length === 1 ? [] : [el("p", {}, "How often each candidate won, always for the whole contest. That's a share of simulations, not a chance of winning.")]));
+  $("rcv-projection-intro").replaceChildren(...(c.letters.length === 1 ? [] : [el("p", {}, "Here we simulate how the remaining ballots could look, based on the counts of ballots expected and the candidate shares of votes already counted in each district. The table below shows how many times each possible election outcome was observed in 1000 simulated elections. These should not be interpreted as candidates' probabilities of winning.")]));
 }
 
 // At most one warning above the rounds: the first of these that applies.
@@ -336,7 +336,7 @@ async function draw() {
   $("count").hidden = whole;
   $("f-hd").closest("label").hidden = whole;
   $("rcv-coverage").closest("details").hidden = whole;
-  $("rcv-dots-details").querySelector("summary").textContent = whole ? "Every contested seat, ranked" : "Every district, ranked";
+  $("rcv-dots-details").querySelector("summary").textContent = whole ? "Every contested seat, ranked" : "District ranking by vote share";
   if (state.hd !== "all" && !c.districts.includes(state.hd)) state.hd = "all";
   fillFilters(c);
   renderDistrictWarning();

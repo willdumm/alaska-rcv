@@ -88,7 +88,7 @@ export function renderFlow(c, result) {
     if (won.round < rounds.length - 1) {
       verdict.push({ cls: "dim", text: won.round === 0
         ? fitted("Alaska's count would have stopped at round 1", "The count would stop at round 1")
-        : fitted("Alaska's count runs on until two remain, but the winner can't change", "Runs on to two; winner can't change") });
+        : fitted("Alaska's count runs on until two candidates remain, but the winner can't change", "Runs on to two; winner can't change") });
     }
   }
   const verdictHeight = verdict.length * 18 + (verdict.length ? 6 : 0);

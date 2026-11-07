@@ -12,11 +12,13 @@ description: An unofficial, preliminary look at Alaska's 2026 general election, 
 
 {{< rcv/prose id="rcv-about" >}}
 
-The Division of Elections posts rankings for scanned ballots, but only first choices for hand-counted ballots, and its own ranked choice tabulation comes on November 18. This page estimates the result from what's posted so far. In ranked choice tabulation, if no one has a majority, the last-place candidate is eliminated and those ballots move to their next choice, until two candidates remain. Moving down the page:
+As part of their preliminary election results, the Division of Elections posts rankings for scanned ballots, but only first choices for hand-counted ballots. The official ranked choice tabulation will be done on November 18 after all ballots are counted. This page estimates election results from what's posted so far.
 
-- **By house district:** first choices in each district, and about how many ballots are left to count.
-- **Ranked choice tabulation:** who would win if counting stopped now, if hand-counted ballots rank like scanned ones.
-- **Simulations:** a better idea of who wins once counting finishes. Each district's uncounted ballots are drawn at random from ballots already counted there, then tabulated, 1,000 times over, to show how many of the 1,000 each candidate wins.
+In ranked choice tabulation, if no candidate has a majority, the last-place candidate is eliminated and those ballots move to their next choice, until two candidates remain. Moving down the page:
+
+- **Results map by house district:** first choices in each district, and about how many ballots are left to count.
+- **Ranked choice tabulation:** who would win if counting stopped now, if hand-counted ballots rank candidates like scanned ballots do.
+- **Simulations:** a better idea of who wins once counting finishes. Each district's uncounted ballots are drawn at random from ballots already counted there, then tabulated. We run this simulation 1,000 times, and count how many simulations each candidate wins.
 - **Ballot rankings:** how scanned ballots ranked their next choices.
 
 {{< /rcv/prose >}}
@@ -49,7 +51,7 @@ Hover or tap a district for its numbers, and tap again to clear it.
 
 {{< /rcv/column >}}
 
-{{< rcv/details id="rcv-dots-details" class="rcv-dots-details" open=true summary="Every district, ranked" >}}
+{{< rcv/details id="rcv-dots-details" class="rcv-dots-details" open=true summary="District ranking by vote share" >}}
 
 {{< rcv/slot id="rcv-dots" class="rcv-chart" >}}
 
@@ -65,7 +67,7 @@ In the view after ranked choice tabulation, hollow dots mark districts with unde
 
 {{< /rcv/columns >}}
 
-{{< rcv/details summary="Every district as a table" >}}
+{{< rcv/details summary="Table of results by district" >}}
 
 {{< rcv/note id="rcv-coverage-caption" >}}{{< /rcv/note >}}
 
@@ -86,14 +88,14 @@ In the view after ranked choice tabulation, hollow dots mark districts with unde
 {{< rcv/slot id="rcv-flow" class="rcv-chart" >}}
 
 {{< rcv/note id="rcv-flow-note" >}}
-Ribbon thickness is ballots, and percentages are of the ballots still in the count that round. Gray is ballots that stopped counting.
+Ribbon thickness is ballots, and percentages are of the ballots still in the count that round. Gray represents ballots with no further valid ranking.
 {{< /rcv/note >}}
 
 {{< rcv/table id="rcv-rounds" >}}
 
 {{< rcv/slot id="rcv-transfers" tag="ul" class="rcv-transfers" >}}
 
-{{< rcv/details summary="The count of scanned ballots alone" >}}
+{{< rcv/details summary="Ranked choice tabulation on only scanned ballots" >}}
 
 {{< rcv/note >}}
 Scanned ballots only, with nothing estimated. Hand-counted ballots aren't here, so don't read this as who's ahead. This is the count that was checked: [see below](#caveats).
@@ -105,7 +107,7 @@ Scanned ballots only, with nothing estimated. Hand-counted ballots aren't here, 
 
 {{< /rcv/section >}}
 
-{{< rcv/section id="projection" title="With the rest of the ballots simulated" tag="Simulated" class="rcv-section-sim" >}}
+{{< rcv/section id="projection" title="Simulated race outcomes, including uncounted ballots" tag="Simulated" class="rcv-section-sim" >}}
 
 {{< rcv/slot id="rcv-projection-intro" >}}
 
@@ -140,7 +142,7 @@ Pick a first choice to see how scanned ballots ranked their next choice.
 
 {{< rcv/slot id="rcv-drill" class="rcv-drill" >}}
 
-{{< rcv/details summary="How many candidates each scanned ballot ranked" >}}
+{{< rcv/details summary="Counts of ranked candidates on each scanned ballot" >}}
 
 {{< rcv/slot id="rcv-depth" class="rcv-depth" >}}
 
