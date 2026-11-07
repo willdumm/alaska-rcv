@@ -10,9 +10,14 @@ passed with `--cacert`, found through the certificate's AIA URL. Don't turn veri
 ## Watching for updates
 
 The Division overwrites its files at the same URLs, so a missed update is gone. `bash scripts/refresh.sh watch STORE CACERT`, run about
-hourly, compares the three files' `Last-Modified` and the table's "Table last updated" text with the last run's, and saves a complete
-snapshot to `STORE/TIME/` when any has changed. It writes nothing to this repo and publishes nothing. A file posted during a
-download shows up as a change next run, so that run's snapshot is the complete one: build the newest for each posting.
+hourly, compares the three files' `Last-Modified` and the table's "Table last updated" text with the last run's, and saves a snapshot
+to `STORE/TIME/` when any has changed. It writes nothing to this repo and publishes nothing. A file posted during a download shows up
+as a change next run, so that run's snapshot is the complete one: build the newest for each posting.
+
+A file that can't be fetched, redirects, or has no `Last-Modified` is a problem, and the run exits with an error, but it doesn't stop the
+others being saved. That snapshot may be missing the file, and `build` stops without it: use the same file from an earlier snapshot if
+it hasn't changed. The file's line in `STORE/seen` stays as it was. If `STORE/notify` is executable, it's run with a title, a message and a
+priority for each new snapshot, when a problem starts or changes, once a day while one lasts, and when it's over. `STORE/failing` holds the current problem.
 
 `.github/workflows/watch.yml` runs that hourly on GitHub through `scripts/watch_action.sh`. A new snapshot becomes a prerelease named
 `watch-TIME`, with its files and `seen`, and an issue; the newest such release's `seen` is the next run's state, so a repo with none

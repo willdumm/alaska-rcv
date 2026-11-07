@@ -24,7 +24,9 @@ iso() { [ -n "$1" ] || { echo "PROBLEM: a time is missing from the Division's re
 header() { tr -d '\r' < "$2" | awk -v name="$1:" 'tolower($1) == name { $1 = ""; print substr($0, 2) }' | tail -1; }
 modified() { iso "$(header last-modified "$1/CVR_Export.zip.headers")"; }
 # A failed request fails this, so it can't look like a file that changed.
-live_modified() { curl -fsSI --max-time 60 --cacert "$1" "$2" | header last-modified /dev/stdin; }
+live_modified() { curl -fsSIL --max-redirs 0 --max-time 60 --cacert "$1" "$2" | header last-modified /dev/stdin; }
+# Saves one URL and its response headers. A redirect's body isn't the file, so it's a failure, and a failure leaves nothing behind.
+get() { curl -fsSL --max-redirs 0 --max-time "$1" --cacert "$2" -D "$3.headers" -o "$3" "$4" || { local code=$?; rm -f "$3" "$3.headers"; return "$code"; }; }
 
 # Every number here decides the result. reproduce reads them back from the committed file instead.
 sim_settings=(--seed 20261104 --tau 0.2 --tau-local 0.28 --tau-party 0.2 --min-pool 300 --min-bucket 30)
@@ -35,47 +37,102 @@ fetch() {
   local raw=$1 cacert=$2
   mkdir -p "$raw"
   for file in "${files[@]}"; do
-    curl -fsS --max-time 600 --cacert "$cacert" -D "$raw/$file.headers" -o "$raw/$file" "$base/$file"
+    get 600 "$cacert" "$raw/$file" "$base/$file"
   done
-  curl -fsS --max-time 60 --cacert "$cacert" -D "$raw/ballots-received-table.html.headers" -o "$raw/ballots-received-table.html" "$received_page"
+  get 60 "$cacert" "$raw/ballots-received-table.html" "$received_page"
   echo "CVR posted $(modified "$raw"), table updated $(table_stamp "$raw/ballots-received-table.html"). Now run build."
 }
 
 # The page's HTML changes on every fetch (nonces, cache stats), so its "Table last updated" text says whether the table did.
 table_stamp() { sed -n 's/.*Table last updated \([^<]*\)\..*/\1/p' "$1" | head -1; }
 
-# What's posted now, one line per file. A page with no table text still gets saved, once, for a person to look at.
-posted() {
-  local cacert=$1 table=$2 file stamp
-  for file in "${files[@]}"; do
-    stamp=$(live_modified "$cacert" "$base/$file") || return 1
-    echo "$file $stamp"
-  done
-  echo "table $(table_stamp "$table")"
+# A source's line in STORE/seen, if it has one: its name, then its Last-Modified or the table's text.
+last_seen() { awk -v name="$1" '$1 == name' "$store/seen" 2>/dev/null || true; }
+problem() { problems+=("$1"); echo "PROBLEM: $1" >&2; }
+# STORE/notify, if it's there, is how a person hears of this. It's run with a title, a message and a priority: 1 for a problem, 0 otherwise.
+notify() { [ ! -x "$store/notify" ] || "$store/notify" "$1" "${2:0:1000}" "$3" || echo "PROBLEM: $store/notify failed" >&2; }
+
+# Tells a person when a problem starts or changes, once a day while it lasts, and when it's over. Any way out of watch ends here.
+watch_end() {
+  local status=$1 text state=$store/failing
+  rm -rf "$work"
+  text=$(printf '%s\n' "${problems[@]}" | sort -u)
+  [ "$status" = 0 ] || [ -n "$text" ] || text="The watch stopped with exit code $status."
+  if [ -z "$text" ]; then
+    [ ! -f "$state" ] || { rm -f "$state"; notify "Alaska RCV watch: working again" "The last run had no problems." 0; }
+  elif [ "$text" != "$(cat "$state" 2>/dev/null)" ] || [ -n "$(find "$state" -mmin +1430 2>/dev/null)" ]; then
+    echo "$text" > "$state" || true
+    notify "Alaska RCV watch: problem" "$text" 1
+  fi
 }
 
-# Run about hourly: the Division overwrites these at the same URLs, so a missed update is gone. Each snapshot is complete, so
-# it can be built on its own. A snapshot taken while files are being posted is followed by a complete one on the next run.
+# Run about hourly: the Division overwrites these at the same URLs, so a missed update is gone. A problem with one source doesn't
+# stop the others being saved, and its line in seen stays as it was, so it counts as a change once it's back with something new.
+# A snapshot has everything that could be downloaded, whether or not it changed. One taken while files are being posted is followed
+# by a complete one on the next run. A page with no table text gets saved once, for a person to look at, and is a problem until fixed.
 watch() {
-  local store=$1 cacert=$2 now saved stamp file
+  local cacert=$2 file stamp code line changed="" table=ballots-received-table.html lines=() news=()
+  store=$1 work="" problems=()
+  trap 'watch_end "$?"' EXIT
+  # Killed, as by a time limit, counts as failing too. Without this, the EXIT trap sees the last command's status.
+  trap 'exit 143' TERM INT
   mkdir -p "$store"
   work=$(mktemp -d "$store/.partial.XXXXXX")
-  trap 'rm -rf "$work"' EXIT
-  curl -fsS --max-time 60 --cacert "$cacert" -D "$work/ballots-received-table.html.headers" -o "$work/ballots-received-table.html" "$received_page"
-  now=$(posted "$cacert" "$work/ballots-received-table.html")
-  if [ "$now" = "$(cat "$store/seen" 2>/dev/null)" ]; then
-    echo "No change: $(echo "$now" | tr '\n' ';')"
+  for file in "${files[@]}"; do
+    code=0
+    stamp=$(live_modified "$cacert" "$base/$file") || code=$?
+    if [ "$code" != 0 ]; then problem "$file: couldn't be fetched (curl error $code)"
+    elif [ -z "$stamp" ]; then problem "$file: no Last-Modified header"
+    elif [ "$file $stamp" != "$(last_seen "$file")" ]; then changed=1
+    fi
+  done
+  code=0
+  get 60 "$cacert" "$work/$table" "$received_page" || code=$?
+  if [ "$code" != 0 ]; then
+    problem "$table: couldn't be fetched (curl error $code)"
+  else
+    [ -n "$(table_stamp "$work/$table")" ] || problem "$table: no \"Table last updated\" text"
+    [ "table $(table_stamp "$work/$table")" = "$(last_seen table)" ] || changed=1
+  fi
+  if [ -z "$changed" ]; then
+    [ "${#problems[@]}" -gt 0 ] || echo "No change: $(tr '\n' ';' < "$store/seen")"
+    [ "${#problems[@]}" = 0 ]
     return
   fi
-  fetch "$work" "$cacert" > /dev/null
   # Recorded from what was downloaded, so a file posted during the download shows up as a change next time.
-  saved=$(for file in "${files[@]}"; do echo "$file $(header last-modified "$work/$file.headers")"; done; echo "table $(table_stamp "$work/ballots-received-table.html")")
+  for file in "${files[@]}"; do
+    code=0
+    get 600 "$cacert" "$work/$file" "$base/$file" || code=$?
+    stamp=""
+    [ "$code" != 0 ] || stamp=$(header last-modified "$work/$file.headers")
+    if [ -n "$stamp" ]; then
+      lines+=("$file $stamp")
+    else
+      if [ "$code" != 0 ]; then problem "$file: couldn't be fetched (curl error $code)"; else problem "$file: no Last-Modified header"; fi
+      line=$(last_seen "$file")
+      [ -z "$line" ] || lines+=("$line")
+    fi
+  done
+  if [ -f "$work/$table" ]; then
+    lines+=("table $(table_stamp "$work/$table")")
+  else
+    line=$(last_seen table)
+    [ -z "$line" ] || lines+=("$line")
+  fi
+  if [ -z "$(ls -A "$work")" ]; then
+    return 1
+  fi
+  for line in "${lines[@]}"; do
+    [ "$line" = "$(last_seen "${line%% *}")" ] || news+=("$line")
+  done
   stamp=$(date -u +%Y-%m-%dT%H%M%SZ)
   mv "$work" "$store/$stamp"
-  echo "$saved" > "$store/seen.new"
+  printf '%s\n' "${lines[@]}" > "$store/seen.new"
   mv "$store/seen.new" "$store/seen"
-  echo "New snapshot $store/$stamp: $(echo "$saved" | tr '\n' ';')"
-  [ -n "$(table_stamp "$store/$stamp/ballots-received-table.html")" ] || { echo "PROBLEM: no \"Table last updated\" text in the saved page"; return 1; }
+  echo "New snapshot $store/$stamp: $(tr '\n' ';' < "$store/seen")"
+  notify "Alaska RCV: new Division data" "Saved $store/$stamp
+$(printf '%s\n' "${news[@]}")" 0
+  [ "${#problems[@]}" = 0 ]
 }
 
 build() {
