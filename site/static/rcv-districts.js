@@ -1,5 +1,5 @@
 // The district views: the list of districts, the coverage table, and the map.
-import { $, addPlates, el, fmt, hideTip, pct, showTip, strong, withTip } from "./rcv-dom.js";
+import { $, addPlates, el, fmt, pct, strong, withTip } from "./rcv-dom.js";
 import { MIDDLE, MARGIN_BREAKS, ballotsLeft, ballotsLeftInContest, coverage, districtBallots, districtName, districts, isStatewide, lowCoverage, placesOf, roundTen } from "./rcv-model.js";
 import { senateSeatOf } from "./rcv-chambers.js";
 import { actions, currentContest as current, state } from "./rcv-state.js";
@@ -78,7 +78,7 @@ export function renderDots(c, shares) {
     .attr("aria-label", `Each district's leader and that candidate's share, grouped by leader. The table below the map has the same numbers.`);
 
   svg.append("text").attr("x", 4).attr("y", 13).attr("class", "strong").text(shares.mode === "final" ? "District leader's share after tabulation" : "District leader's share of first choices");
-  const ticks = x.ticks(width < 340 ? 3 : 5);
+  const ticks = x.ticks(width < 500 ? 4 : 5);
   const axis = svg.append("g");
   axis.selectAll("line").data(ticks).join("line").attr("x1", x).attr("x2", x).attr("y1", margin.top - 8).attr("y2", height - margin.bottom)
     .attr("stroke", (d) => (d === 0.5 ? "#a9b0b8" : "#e6e8eb"));
@@ -118,9 +118,8 @@ export function renderDots(c, shares) {
     d.hd === "all" ? (isStatewide(c) ? "Statewide" : "All districts") : `${districtName(d.hd)}: ${placesOf(d.hd)}`,
     `${fmt(d.votes[d.leader])} ${c.byLetter[d.leader].short}, ${fmt(d.votes[d.next])} ${c.byLetter[d.next].short}`,
     `About ${roundLeft(leftOf(d).total)} ballots left: an estimated ${roundLeft(leftOf(d).uncounted)} early and absentee not yet counted, and an estimated ${roundLeft(leftOf(d).questioned)} questioned`,
-    ...(isHollow(d, shares) ? [`Rankings known for ${pct(districtBallots(d.hd).cvr, districtBallots(d.hd).summary, 0)} of this district's counted ballots`] : [])]);
-  row.on("click", (event, d) => { selectDistrict(d.hd === "all" ? "all" : d.hd); });
-  row.on("pointerenter.map", (event, d) => highlightDistricts(d.hd === "all" ? [] : [d.hd])).on("pointerleave.map", () => highlightDistricts([]));
+    ...(isHollow(d, shares) ? [`Rankings known for ${pct(districtBallots(d.hd).cvr, districtBallots(d.hd).summary, 0)} of this district's counted ballots`] : [])],
+    { over: (d) => highlightDistricts(d.hd === "all" ? [] : [d.hd]), out: () => highlightDistricts([]), act: (d) => selectDistrict(d.hd) });
 
   svg.append("g").selectAll("rect").data(groups).join("rect").attr("class", "left-bar")
     .attr("x", (g) => width - leftScale(leaderLeft(g))).attr("y", (g) => y(lines.indexOf(g)) + 5).attr("height", rowHeight - 6).attr("rx", 2)
@@ -224,14 +223,10 @@ function drawPanel(parent, projection, width, height, { features = districts.fea
   const svg = d3.select(parent).append("svg").attr("viewBox", `0 0 ${width} ${height}`).attr("width", width).attr("height", height);
   const shapes = svg.append("g").selectAll("path").data(features).join("path")
     .attr("class", "district").attr("d", path)
-    .on("pointerenter pointermove", (event, f) => {
-      const { hd } = f.properties;
-      highlightDistricts([hd]);
-      showTip(event, lastShares?.titleOf?.(hd) ?? districtName(hd), placesOf(hd), mapTipText(hd));
-    })
-    .on("pointerleave", () => { highlightDistricts([]); hideTip(); })
-    .on("click", (event, f) => {
-      if (currentContest()?.districts.includes(f.properties.hd)) selectDistrict(f.properties.hd);
+    .call(withTip, ({ properties: { hd } }) => [lastShares?.titleOf?.(hd) ?? districtName(hd), placesOf(hd), mapTipText(hd)], {
+      over: (f) => highlightDistricts([f.properties.hd]),
+      out: () => highlightDistricts([]),
+      act: (f) => { if (currentContest()?.districts.includes(f.properties.hd)) selectDistrict(f.properties.hd); },
     });
   const fits = (f) => {
     const [[x0, y0], [x1, y1]] = path.bounds(f);
@@ -325,7 +320,8 @@ export function drawMap() {
   mapPanels = [drawPanel(stateBox, whole, width, height, { features, seatOf })];
   for (const { figure, projection, insetWidth, insetHeight, outline } of views) {
     mapPanels.push(drawPanel(figure, projection, insetWidth, insetHeight, { seatOf }));
-    for (const line of ["inset-casing", "inset-outline"]) mapPanels[0].svg.append("path").attr("class", line).attr("d", d3.geoPath(whole)(outline));
+    // Closed, so the line's two ends join at the corner they share rather than leaving a notch there.
+    for (const line of ["inset-casing", "inset-outline"]) mapPanels[0].svg.append("path").attr("class", line).attr("d", `${d3.geoPath(whole)(outline)}Z`);
   }
   mapPanels[0].labelLayer.raise();
   clearSmallOutlines(mapPanels[0].labels, views.map((v) => d3.geoPath(whole).bounds(v.outline)));

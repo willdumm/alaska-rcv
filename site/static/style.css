@@ -136,6 +136,8 @@ main > section.rcv-section-sim { --bg: #fdf8ea; margin: 32px -16px 0; padding: 3
 .rcv-chart .decided { fill: var(--bg); opacity: .5; pointer-events: none; }
 .rcv-chart .round-line { stroke: var(--muted); stroke-dasharray: 2 4; pointer-events: none; }
 .rcv-chart .round-line.deciding { stroke: var(--heading); stroke-dasharray: none; }
+.rcv-chart .round-bar { stroke: var(--muted); stroke-width: 2; }
+.rcv-chart .round-bar.deciding { stroke: var(--heading); }
 .rcv-chart .flow-name, .rcv-chart .flow-labels { pointer-events: none; }
 .rcv-chart .flows:hover .ribbon, .rcv-chart .flows:focus-within .ribbon { opacity: .65; }
 .rcv-chart .flows .ribbon:hover, .rcv-chart .flows .ribbon:focus { opacity: 1; }
@@ -183,8 +185,8 @@ button.rcv-choice[aria-pressed="true"] { border-color: var(--heading); backgroun
 .rcv-districts { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; align-items: start; }
 @media (max-width: 760px) { .rcv-districts { grid-template-columns: 1fr; } }
 #rcv-map svg { display: block; max-width: 100%; height: auto; overflow: hidden; font-family: var(--font); }
-#rcv-map .district { stroke: #59626c; stroke-width: .6; stroke-linejoin: round; cursor: pointer; }
-#rcv-map .district.off-ballot { stroke: #d5d9dd; cursor: default; }
+#rcv-map .district { stroke: #fff; stroke-width: .6; stroke-linejoin: round; cursor: pointer; }
+#rcv-map .district.off-ballot { cursor: default; }
 #rcv-map .district.hovered { stroke: #111418; stroke-width: 1.5; }
 #rcv-map .district.selected { stroke: #111418; stroke-width: 2.5; }
 #rcv-map .district:focus-visible { outline: none; stroke: var(--link); stroke-width: 2.5; }
@@ -192,8 +194,8 @@ button.rcv-choice[aria-pressed="true"] { border-color: var(--heading); backgroun
 #rcv-map .district-label text { font-size: 12px; font-weight: 600; fill: #111418; }
 #rcv-map .district-label .plate { fill: #fff; }
 #rcv-map .district-label.off-ballot text { fill: var(--muted); font-weight: 400; }
-#rcv-map .inset-casing { fill: none; stroke: #fff; stroke-width: 4; pointer-events: none; }
-#rcv-map .inset-outline { fill: none; stroke: #111418; stroke-width: 2; pointer-events: none; }
+#rcv-map .inset-casing { fill: none; stroke: #fff; stroke-width: 2.5; pointer-events: none; }
+#rcv-map .inset-outline { fill: none; stroke: #111418; stroke-width: 1.25; pointer-events: none; }
 .rcv-map-insets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .rcv-map-insets figure { min-width: 0; margin: 0; }
 .rcv-map-insets figcaption { margin-bottom: 4px; font-size: 13px; font-weight: 600; color: var(--muted); }
@@ -203,9 +205,9 @@ button.rcv-choice[aria-pressed="true"] { border-color: var(--heading); backgroun
 .rcv-scale .ramp { display: inline-flex; gap: 2px; }
 .rcv-scale .ramp i { display: block; width: 22px; height: 12px; }
 .rcv-details { margin-top: 20px; }
-.rcv-details summary, .rcv-dots-details summary { min-height: 32px; font-weight: 600; cursor: pointer; }
-.rcv-dots-details summary { display: none; }
-@media (max-width: 760px) { .rcv-dots-details summary { display: list-item; } }
+.rcv-details summary { min-height: 32px; font-weight: 600; cursor: pointer; }
+/* On a touch screen a press on a chart is a tap, and doesn't select its text or flash the mark. */
+@media (pointer: coarse) { .rcv-chart svg, #rcv-map svg { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; } }
 
 .rcv-tip { position: fixed; z-index: 20; max-width: 280px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); box-shadow: 0 2px 10px rgba(0,0,0,.12); font-size: 14px; line-height: 1.35; pointer-events: none; }
 .rcv-tip strong { display: block; font-size: 15px; color: var(--heading); }

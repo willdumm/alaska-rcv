@@ -37,7 +37,7 @@ function storyLayout(rounds, width, x, wrapped, storyOf) {
   const blocks = rounds.map((round, i) => {
     const left = Math.max(0, x(i) - reach + (i ? STORY_GAP / 2 : 0));
     const right = Math.min(width, x(i) + reach - (i < rounds.length - 1 ? STORY_GAP / 2 : 0));
-    return { left, level: i % levels, lines: wrapped(storyOf(i), right - left) };
+    return { left, right, level: i % levels, lines: wrapped(storyOf(i), right - left) };
   });
   let top = 10;
   for (let level = 0; level < levels; level++) {
@@ -202,10 +202,13 @@ export function renderFlow(c, result) {
     heading.append("tspan").attr("x", x(i)).attr("y", plotTop - 9).attr("class", "dim").text(roundDetail(round));
   }
 
-  for (const { left, top, lines } of stories.blocks) {
+  stories.blocks.forEach(({ left, right, top, lines }, i) => {
+    // The bar the story hangs from, joining it to its round's line.
+    svg.append("line").attr("class", won?.round === i ? "round-bar deciding" : "round-bar")
+      .attr("x1", left).attr("x2", right).attr("y1", plotBottom + top - 4).attr("y2", plotBottom + top - 4);
     const story = svg.append("text").attr("text-anchor", rounds.length === 1 ? "middle" : null);
     lines.forEach((line, n) => story.append("tspan").attr("x", rounds.length === 1 ? width / 2 : left).attr("y", plotBottom + top + 13 + n * STORY_LINE).text(line));
-  }
+  });
 
   for (const l of keys) {
     const name = svg.append("g").attr("class", "flow-name");

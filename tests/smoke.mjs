@@ -197,7 +197,6 @@ for (const chamber of ["senate", "house"]) {
 // Each leader's line has its total of ballots left: a bar that stays on the chart, behind the background of the line's text.
 {
   const { page } = await opened(context, base);
-  await page.evaluate(() => document.querySelector(".rcv-dots-details").open = true);
   const lines = await page.evaluate(() => {
     const svg = document.querySelector("#rcv-dots svg");
     const bars = [...svg.querySelectorAll("rect.left-bar")].filter((bar) => !bar.closest(".row"));
@@ -247,6 +246,33 @@ for (const [text, target] of [["see the ranked choice tabulation", "#rcv-flow"],
   if (first === await fills()) problems.push("the map's tabulation view looks the same as first choices");
   if (errors.length) problems.push(`the map's tabulation view: ${errors.join("; ")}`);
   await page.close();
+}
+// On a touch screen, the first tap on a mark shows its tooltip and does nothing else, the second does what a click does, and a
+// tap elsewhere puts the tooltip away. The list of districts is drawn at phone width too, without having to be opened.
+{
+  const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const { page, errors } = await opened(phone, base);
+  const tipShown = () => page.locator("#rcv-tip").isVisible();
+  const selected = () => new URL(page.url()).searchParams.get("hd");
+  if (!(await page.locator("#rcv-dots svg").isVisible())) problems.push("the list of districts isn't showing on a phone");
+  const row = page.locator("#rcv-dots .row").nth(1);
+  await row.scrollIntoViewIfNeeded();
+  await row.tap();
+  if (!(await tipShown())) problems.push("a first tap on a district's row shows no tooltip");
+  if (selected()) problems.push("a first tap on a district's row selects it");
+  if (await page.locator("#rcv-map path.hovered").count() < 1) problems.push("a first tap on a district's row doesn't light the map");
+  await page.locator("#rcv-updated").tap();
+  if (await tipShown()) problems.push("a tap elsewhere leaves the tooltip up");
+  await row.tap();
+  await row.tap();
+  await page.waitForFunction(() => new URL(location.href).searchParams.has("hd"));
+  if (await tipShown()) problems.push("a second tap leaves the tooltip up");
+  const ribbon = page.locator("#rcv-flow .ribbon").first();
+  await ribbon.scrollIntoViewIfNeeded();
+  await ribbon.tap();
+  if (!(await tipShown())) problems.push("a tap on the flow chart shows no tooltip");
+  if (errors.length) problems.push(`tapping: ${errors.join("; ")}`);
+  await phone.close();
 }
 const stamp = /coverage\.json/;
 await context.route(stamp, async (route) => {

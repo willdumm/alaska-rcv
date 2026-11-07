@@ -127,7 +127,7 @@ function renderSeatDots(c) {
   const svg = d3.select(box).append("svg").attr("class", "rcv-seat-dots").attr("viewBox", `0 0 ${width} ${height}`).attr("role", "group")
     .attr("aria-label", `Every contested seat's top candidate and that candidate's ${first ? "share of first choices" : "simulations won"}, grouped by party. Choose one to open its race.`);
   svg.append("text").attr("x", 4).attr("y", 13).attr("class", "strong").text(first ? "Leader's share of first choices" : `Most frequent winner's simulations won, of ${fmt(runs)}`);
-  const ticks = x.ticks(width < 340 ? 3 : 5);
+  const ticks = x.ticks(width < 500 ? 4 : 5);
   const axis = svg.append("g");
   axis.selectAll("line").data(ticks).join("line").attr("x1", x).attr("x2", x).attr("y1", margin.top - 8).attr("y2", height - margin.bottom)
     .attr("stroke", (d) => (d === 0.5 ? "#a9b0b8" : "#e6e8eb"));
@@ -142,11 +142,11 @@ function renderSeatDots(c) {
   row.append("text").attr("x", 4).attr("y", rowHeight / 2 + 4).text((d) => d.race.seat);
   row.append("circle").attr("cx", (d) => x(d.share)).attr("cy", rowHeight / 2).attr("r", 5).attr("fill", (d) => colorOfGroup[d.who.group]).attr("stroke", "#fff").attr("stroke-width", 2);
   row.append("text").attr("x", width - 4).attr("y", rowHeight / 2 + 4).attr("text-anchor", "end").text((d) => d.who.short);
-  row.call(withTip, (d) => first ? [pct(d.share, 1), d.race.seat, firstChoicesLine(d.race.candidates, d.race.total)] : [ofRuns(d.who.wins), d.race.seat, `${withParty(d.who)} wins ${ofRuns(d.who.wins)} simulations`]);
-  row.on("click", (event, d) => open(d))
-    .on("keydown", (event, d) => { if (event.key === "Enter") open(d); })
-    .on("pointerenter.map focus.map", (event, d) => highlightDistricts(d.race.hds))
-    .on("pointerleave.map blur.map", () => highlightDistricts([]));
+  row.call(withTip, (d) => first ? [pct(d.share, 1), d.race.seat, firstChoicesLine(d.race.candidates, d.race.total)] : [ofRuns(d.who.wins), d.race.seat, `${withParty(d.who)} wins ${ofRuns(d.who.wins)} simulations`],
+    { over: (d) => highlightDistricts(d.race.hds), out: () => highlightDistricts([]), act: open });
+  row.on("keydown", (event, d) => { if (event.key === "Enter") open(d); })
+    .on("focus.map", (event, d) => highlightDistricts(d.race.hds))
+    .on("blur.map", () => highlightDistricts([]));
 
   drawGroupHeadings(svg, groups, { y, rowHeight, colorOf: ({ g }) => g.color, textOf: ({ g, members }) => `${g.name}: ${members.length} ${members.length === 1 ? "seat" : "seats"}` });
 }

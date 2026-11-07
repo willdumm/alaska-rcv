@@ -4,7 +4,7 @@
 import { tabulate } from "./rcv-tabulate.js";
 import { ballotCounts } from "./rcv-rows.js";
 import { measureContest, measuresIn } from "./rcv-measures.js";
-import { $, alaskaTime, el, fmt, hideTip, pct, strong } from "./rcv-dom.js";
+import { $, alaskaTime, el, fmt, pct, strong, watchPointers } from "./rcv-dom.js";
 import { INACTIVE_COLOR, LOW_RANKINGS, ballotsLeft, ballotsLeftInContest, countedBallots, coverage, districtName, districtShares, districts, index, knownRankings, majorityIn, ofRuns, parseStamp, placesOf, prepareContest, projection, readRanking, roundTen, setData, summaryEntry, summaryFor } from "./rcv-model.js";
 import { renderFlow, roundStory } from "./rcv-flow.js";
 import { renderProjection } from "./rcv-projection.js";
@@ -336,7 +336,6 @@ async function draw() {
   $("count").hidden = whole;
   $("f-hd").closest("label").hidden = whole;
   $("rcv-coverage").closest("details").hidden = whole;
-  $("rcv-dots-details").querySelector("summary").textContent = whole ? "Every contested seat, ranked" : "District ranking by vote share";
   if (state.hd !== "all" && !c.districts.includes(state.hd)) state.hd = "all";
   fillFilters(c);
   renderDistrictWarning();
@@ -392,15 +391,8 @@ async function main() {
     showFailure(error);
   }
   readURL();
-  // The district plot starts collapsed on a phone, and only a phone can collapse it.
-  const phone = matchMedia("(max-width: 760px)");
-  const dotsDetails = $("rcv-dots-details");
-  dotsDetails.open = !phone.matches;
   windAllRings();
   await render();
-  phone.addEventListener("change", () => { dotsDetails.open = !phone.matches; });
-  // A closed box has no width to draw to, so draw the plot again when it opens.
-  dotsDetails.addEventListener("toggle", () => { if (dotsDetails.open) render(); });
 
   $("f-contest").addEventListener("change", (event) => {
     const { value } = event.target;
@@ -424,7 +416,7 @@ async function main() {
     width = innerWidth;
     render();
   });
-  addEventListener("scroll", hideTip, { passive: true });
+  watchPointers();
 }
 
 main();

@@ -44,14 +44,14 @@ This page runs the count in your browser, so it needs JavaScript. The caveats an
 {{< rcv/slot id="rcv-map-legend" class="rcv-scale" >}}
 
 {{< rcv/note id="rcv-map-insets-note" >}}
-Hover or tap a district for its numbers, and tap again to clear it.
+Hover over or tap a district for its numbers. Click it, or tap it a second time, to show only that district, and do that again to clear it.
 {{< /rcv/note >}}
 
 {{< rcv/note id="rcv-selected" muted=false >}}{{< /rcv/note >}}
 
 {{< /rcv/column >}}
 
-{{< rcv/details id="rcv-dots-details" class="rcv-dots-details" open=true summary="District ranking by vote share" >}}
+{{< rcv/column >}}
 
 {{< rcv/slot id="rcv-dots" class="rcv-chart" >}}
 
@@ -63,7 +63,7 @@ Hover or tap a district for its numbers, and tap again to clear it.
 In the view after ranked choice tabulation, hollow dots mark districts with under 90% of rankings known.
 {{< /rcv/note >}}
 
-{{< /rcv/details >}}
+{{< /rcv/column >}}
 
 {{< /rcv/columns >}}
 

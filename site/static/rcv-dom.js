@@ -44,8 +44,35 @@ export function showTip(event, value, ...lines) {
 export function hideTip() { tip().hidden = true; }
 
 // Tooltips are for a pointer. Every chart has a table or a picker with the same numbers for the keyboard.
-export function withTip(selection, contentOf) {
+// A mouse hovers, then clicks. A finger can't hover, so its first tap on a mark stands in for the hover and a second tap on
+// the same mark for the click. A drag only scrolls. `over` and `out` go with the tooltip, and `act` is the click.
+let lastPointer = "mouse";
+let held = null;
+export function withTip(selection, contentOf, { over, out, act } = {}) {
+  const show = (event, d) => { over?.(d); showTip(event, ...contentOf(d)); };
+  const hide = () => { out?.(); hideTip(); };
   selection
-    .on("pointerenter pointermove click", (event, d) => showTip(event, ...contentOf(d)))
-    .on("pointerleave", hideTip);
+    .on("pointerenter", (event, d) => { if (event.pointerType === "mouse") show(event, d); })
+    .on("pointermove", (event, d) => { if (event.pointerType === "mouse") showTip(event, ...contentOf(d)); })
+    .on("pointerleave", (event) => { if (event.pointerType === "mouse") hide(); })
+    .on("click", function (event, d) {
+      if (lastPointer === "mouse") { act?.(d); return; }
+      const again = held?.node === this;
+      letGo();
+      if (again) { act?.(d); return; }
+      show(event, d);
+      held = { node: this, hide };
+    });
+}
+function letGo() {
+  held?.hide();
+  held = null;
+}
+// A tap elsewhere or a scroll puts away what a tap showed. A click doesn't always say what kind of pointer made it, so this notes that.
+export function watchPointers() {
+  addEventListener("pointerdown", (event) => {
+    lastPointer = event.pointerType;
+    if (held && !held.node.contains(event.target)) letGo();
+  }, true);
+  addEventListener("scroll", () => { hideTip(); letGo(); }, { passive: true });
 }
