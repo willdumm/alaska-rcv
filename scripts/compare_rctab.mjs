@@ -8,13 +8,13 @@
 // - With each repeated ranking in our rankings treated RCTab's way: a rank that's passed over, not a blank one, like a
 //   write-in in readBallot. There should be no differences at all.
 // Exits with an error unless the second comparison is clean, so it fails if anything but that rule differs.
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { tabulate } from "../site/static/rcv-tabulate.js";
 import { ballotCounts } from "../site/static/rcv-rows.js";
+import { readJson } from "./lib.mjs";
 
 const [dir, work] = process.argv.slice(2);
-const load = (path) => JSON.parse(readFileSync(path, "utf8"));
 
 function repeatsPassedOver(pattern) {
   const seen = new Set();
@@ -62,9 +62,9 @@ function differences(mine, theirs, candidates) {
 
 let compared = 0, rounds = 0, asIsDiffer = 0, unexplained = 0, largestVoteGap = 0;
 for (const name of readdirSync(work).filter((n) => n.startsWith("contest-")).sort((a, b) => a.slice(8) - b.slice(8))) {
-  const c = load(join(dir, `${name}.json`));
+  const c = readJson(join(dir, `${name}.json`));
   const report = readdirSync(join(work, name, "output"), { recursive: true }).find((f) => f.endsWith("_detailed_report.json"));
-  const theirs = load(join(work, name, "output", report));
+  const theirs = readJson(join(work, name, "output", report));
   const letters = c.candidates.map((x) => x.letter);
   const ballots = ballotCounts(c);
   const total = ballots.reduce((sum, b) => sum + b[1], 0);

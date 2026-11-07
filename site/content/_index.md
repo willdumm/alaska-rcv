@@ -15,7 +15,7 @@ The Division of Elections posts rankings for scanned ballots, but only first cho
 
 - **By house district:** first choices in each district, and about how many ballots are left to count.
 - **Ranked choice tabulation:** who would win if counting stopped now, if hand-counted ballots rank like scanned ones.
-- **Simulations:** a better idea of who wins once counting finishes. Each district's uncounted ballots are drawn at random from ballots already counted there, then tabulated, 100 times over, to show how often each candidate wins.
+- **Simulations:** a better idea of who wins once counting finishes. Each district's uncounted ballots are drawn at random from ballots already counted there, then tabulated, 1,000 times over, to show how many of the 1,000 each candidate wins.
 - **Ballot rankings:** how scanned ballots ranked their next choices.
 
 {{< /rcv/prose >}}
@@ -118,7 +118,7 @@ Scanned ballots only, with nothing estimated. Hand-counted ballots aren't here, 
 
 {{< rcv/details id="rcv-how-simulation" summary="How the simulation works and what it assumes" >}}
 
-For each district, the simulation estimates how many ballots are still uncounted and fills them in by drawing at random from ballots already counted there, rankings included. It adds a random skew for or against each candidate, runs ranked choice tabulation on the result, and repeats 100 times.
+For each district, the simulation estimates how many ballots are still uncounted and fills them in by drawing at random from ballots already counted there, rankings included. It adds a random skew for or against each candidate, runs ranked choice tabulation on the result, and repeats 1,000 times. Each dot on the plot is one simulation.
 
 It assumes:
 
@@ -127,7 +127,7 @@ It assumes:
 - **Uncounted ballots vote like counted ones of the same kind, apart from the skew.** Early and absentee ballots are drawn from those in the district, and questioned ballots from its Election Day and hand-counted ballots. A district with under 300 to draw from also uses its other ballots.
 - **The skew favors no one on average.** Its size comes from 2024, when absentee ballots landed about 7 points from early ballots in the same district in statewide races, and further in State House races. That year absentee ballots ran more Democratic than early ballots, and questioned ballots ran more Republican than Election Day ballots. The simulation doesn't assume either repeats. In State House and Senate races, candidates of the same party share part of their skew.
 
-It leaves out ballots yet to arrive, ballots the Division rejects, precincts yet to report, and the rankings on write-in ballots, since scanned ballot data doesn't name write-ins. Chance alone moves a count near 80 of 100 wins by about 4, so small differences mean nothing.
+It leaves out ballots yet to arrive, ballots the Division rejects, precincts yet to report, and the rankings on write-in ballots, since scanned ballot data doesn't name write-ins. Chance alone moves a count near 500 of 1,000 wins by about 16, so small differences mean nothing.
 
 {{< /rcv/details >}}
 

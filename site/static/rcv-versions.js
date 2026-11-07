@@ -48,6 +48,6 @@ export function renderVersions({ versions, earlier, missing }) {
   warning.replaceChildren(strong(`Earlier version: the Division's data as of ${alaskaTime(new Date(earlier.time))}. `),
     el("button", { type: "button", class: "rcv-reset", onclick: () => goTo(latest, latest) }, "Back to the latest"));
   warning.hidden = false;
-  note.textContent = `This runs today's model on what the Division had posted then, so it isn't what this page showed that day. The simulations run 100 times per race, so a close race's count of wins can move several wins between versions by chance alone.${earlier.note ? ` ${earlier.note}` : ""}`;
+  note.textContent = `This runs today's model on what the Division had posted then, so it isn't what this page showed that day. The simulations run 1,000 times per race, so a close race's wins can move by about 16 of 1,000 between versions by chance alone.${earlier.note ? ` ${earlier.note}` : ""}`;
   note.hidden = false;
 }

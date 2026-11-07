@@ -1,8 +1,10 @@
 // The page's numbers, with no drawing: the page imports this and the tests run it directly. Nothing here touches the DOM or d3.
 import { readBallot, tabulate } from "./rcv-tabulate.js";
 import { questionedAheadOfCvr, questionedByDistrict, uncountedByDistrict } from "./rcv-uncounted.js";
-import { GROUP, ballotCounts, eachRow } from "./rcv-rows.js";
+import { GROUP, ballotCounts, eachRow, sum } from "./rcv-rows.js";
+import { PARTY_COLORS } from "./rcv-chambers.js";
 import { projectedBallots } from "./rcv-projected.js";
+import { fmt } from "./rcv-dom.js";
 
 // The loaded data files. These are live bindings, so the drawing modules always see what setData last set.
 export let index, coverage, districts, districtNames, earlyAbsentee2024, questioned2024, projection;
@@ -12,21 +14,24 @@ export function setData(data) {
   questionedEstimates.clear();
 }
 
+// A count of simulations, as the page always writes one.
+export const ofRuns = (count) => `${fmt(count)} of ${fmt(projection.parameters.runs)}`;
+
 export const MIDDLE = "#ece9e4";
 export const MARGIN_BREAKS = [2.5, 10, 25];
 export const LOW_COVERAGE = 0.9;
+// Under this share of ballots with known rankings, where the rest go next is close to a guess.
+export const LOW_RANKINGS = 0.5;
 
 export function lowCoverage(hd) {
   const { summary, cvr } = districtBallots(hd);
   return summary > 0 && cvr / summary < LOW_COVERAGE;
 }
 
-const sum = (values) => values.reduce((a, b) => a + b, 0);
-
 // In each contest the best-placed Republican is red, Democrat blue and independent yellow. Everyone else
 // takes the next of OTHER_COLORS. Checked for contrast against this
 // site's white surface. A candidate keeps its colour through every filter within a contest.
-const PARTY_COLORS = { republican: "#e34948", democrat: "#2a78d6", independent: "#eda100" };
+const CANDIDATE_COLORS = { republican: PARTY_COLORS.republican, democrat: PARTY_COLORS.democrat, independent: PARTY_COLORS.other };
 const OTHER_COLORS = ["#1baf7a", "#a0529e", "#e87ba4"];
 const MEASURE_COLORS = { Y: "#1baf7a", N: "#a0529e" };
 export const INACTIVE_COLOR = "#9aa2ab";
@@ -62,7 +67,7 @@ export function prepareContest(c) {
   c.color = {};
   for (const l of c.order) {
     const party = partyOf(c.byLetter[l]);
-    c.color[l] = party && !parties.has(party) ? PARTY_COLORS[party] : others.shift();
+    c.color[l] = party && !parties.has(party) ? CANDIDATE_COLORS[party] : others.shift();
     if (party) parties.add(party);
   }
   if (c.measure) { c.order = c.letters; c.color = MEASURE_COLORS; }
@@ -143,16 +148,18 @@ export function majorityIn(rounds) {
 }
 
 // Offsets each point's y from its line by as little as keeps it from touching the ones already placed.
-export function swarm(points, radius) {
+export function swarm(points, radius, maxReach = Infinity) {
   const placed = [];
+  const offset = (step) => (step % 2 ? (step + 1) / 2 : -step / 2);
   for (const point of [...points].sort((p, q) => p.x - q.x)) {
     const clear = (y) => placed.every((o) => (o.x - point.x) ** 2 + (o.y - y) ** 2 >= (2 * radius) ** 2);
     let step = 0;
-    while (!clear(step % 2 ? (step + 1) / 2 : -step / 2)) step++;
-    point.y = step % 2 ? (step + 1) / 2 : -step / 2;
+    while (Math.abs(offset(step)) <= maxReach && !clear(offset(step))) step++;
+    if (Math.abs(offset(step)) > maxReach) continue;
+    point.y = offset(step);
     placed.push(point);
   }
-  return points;
+  return placed;
 }
 
 // Who leads each district, and with what share. In "first" mode that's of every candidate's first choices in the summary. In

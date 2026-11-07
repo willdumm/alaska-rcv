@@ -22,10 +22,10 @@
 // Rows marked "any" use every cell with enough truth and only the race-wide source, whatever the district's own pool.
 // Draws are seeded, so the same arguments print the same tables. Writes nothing but stdout.
 // Usage: node compare_rank_sources.mjs --seed S --draws D --sizes 10,20,30,50,100,200 --blend 10,30,100,300 --min-truth M DIR...
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { readBallot, tabulate } from "../site/static/rcv-tabulate.js";
-import { GROUP, ballotCounts, eachRow } from "../site/static/rcv-rows.js";
+import { readBallot } from "../site/static/rcv-tabulate.js";
+import { GROUP, eachRow } from "../site/static/rcv-rows.js";
+import { add, finalists as finalistsOf, generator, loadContest, readJson } from "./lib.mjs";
 
 const RURAL = new Set([37, 38, 39, 40]);
 const MIN_CANDIDATES = 3;
@@ -51,23 +51,12 @@ const opts = parseArgs(process.argv.slice(2));
 const sizes = [...opts.sizes].sort((a, b) => a - b);
 const SOURCES = ["district", "race", ...opts.blend.map((k) => `blend-${k}`)];
 
-// mulberry32: small, seedable, and the same on every machine.
-function generator(start) {
-  let s = start | 0;
-  return () => {
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 function shuffle(array, random) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
     [array[i], array[j]] = [array[j], array[i]];
   }
 }
-const add = (map, key, n) => map.set(key, (map.get(key) || 0) + n);
 
 // Sums, per variant, rural or not, row (n or "any") and source.
 const blank = () => ({ w: 0, tv: 0, fw: 0, fse: 0, fvar: 0 });
@@ -80,12 +69,6 @@ function noteFloor(variant, rural, row, w, floor, newCell) {
   floors[key].w += w;
   floors[key].floor += w * floor;
   if (newCell) cellCounts[key] = (cellCounts[key] ?? 0) + 1;
-}
-
-function finalistsOf(c) {
-  const { rounds } = tabulate(ballotCounts(c), c.letters, [], { ignoreMajority: true });
-  const last = rounds[rounds.length - 1].votes;
-  return c.letters.slice().sort((a, b) => last[b] - last[a]).slice(0, 2);
 }
 
 function analyse(c, variant, salt) {
@@ -221,12 +204,12 @@ function print(variant, groupName, metric) {
 
 console.log(`seed ${opts.seed}, ${opts.draws} draws, sizes ${sizes.join(",")}, blend ${opts.blend.join(",")}, min-truth ${opts["min-truth"]}`);
 for (const dir of opts.dirs) {
-  const index = JSON.parse(readFileSync(join(dir, "ballots.json"), "utf8"));
+  const index = readJson(join(dir, "ballots.json"));
   console.log(`\n=== ${dir}`);
   for (const t of [tables, floors, cellCounts]) for (const key of Object.keys(t)) delete t[key];
   const used = [];
   for (const { id, name } of index.contests) {
-    const c = JSON.parse(readFileSync(join(dir, `contest-${id}.json`), "utf8"));
+    const c = loadContest(dir, id);
     c.letters = c.candidates.map((x) => x.letter);
     const districts = new Set(Array.from({ length: c.rows.length / 4 }, (_, i) => c.rows[4 * i + 1]));
     if (c.letters.length < MIN_CANDIDATES || districts.size < 2) continue;

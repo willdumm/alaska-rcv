@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { districtShares, placesOf, prepareContest, setData, summaryFor } from "../site/static/rcv-model.js";
+import { districtShares, placesOf, prepareContest, setData, summaryFor, swarm } from "../site/static/rcv-model.js";
 
 const data = (name) => JSON.parse(readFileSync(new URL(`../site/static/data/alaska-rcv-2026/${name}`, import.meta.url)));
 const index = data("ballots.json");
@@ -56,4 +56,14 @@ test("three candidates can each lead a district, though only two reach the final
   assert.equal(first.get(3).share, 40 / 60);
   const final = districtShares(c, "final").shares;
   assert.ok([1, 2, 3].every((hd) => c.order.slice(0, 2).includes(final.get(hd).leader)));
+});
+
+test("a swarm doesn't overlap, and leaves out what would stack past its limit", () => {
+  const points = () => Array.from({ length: 50 }, (_, i) => ({ x: i / 10 }));
+  const all = swarm(points(), 2);
+  assert.equal(all.length, 50);
+  for (const [i, p] of all.entries()) for (const q of all.slice(i + 1)) assert.ok((p.x - q.x) ** 2 + (p.y - q.y) ** 2 >= 16);
+  const capped = swarm(points(), 2, 10);
+  assert.ok(capped.length > 0 && capped.length < 50);
+  assert.ok(capped.every((p) => Math.abs(p.y) <= 10));
 });

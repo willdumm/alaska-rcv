@@ -1,3 +1,5 @@
+import { sum } from "./rcv-rows.js";
+
 // Ballots received but not yet counted, per district. The Division only publishes the statewide total,
 // so this expects each district to end up with its 2024 share of early and absentee ballots, takes off
 // what it has counted already, and scales the rest to the statewide total. It leaves out the Division's questioned
@@ -6,7 +8,6 @@
 export function uncountedByDistrict(coverage, earlyAbsentee2024) {
   const { received, cvrBallotsByGroup } = coverage;
   const ballots = received.received - received.questioned;
-  const sum = (values) => values.reduce((a, b) => a + b, 0);
   // The summary can run ahead of the CVR, and then these ballots are already among the hand-counted ones.
   const inSummary = (method) => sum(Object.values(coverage.districts).map((d) => d.summary[method] || 0));
   const statewide = Math.max(0, ballots - Math.max(cvrBallotsByGroup[2] || 0, inSummary("ab")) - Math.max(cvrBallotsByGroup[3] || 0, inSummary("ev")));

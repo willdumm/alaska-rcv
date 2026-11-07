@@ -8,10 +8,10 @@ section says what it assumes in brief. `refresh.sh build` runs it in the refresh
 The CVR holds only scanned ballots that have been counted. The simulation asks what the rest could do: it fills in the
 ballots still to be counted with copies of real ballots, runs the real tabulator, and repeats. The requirements are:
 
-- Simulate each race 100 times, locally, and store the result as a static file.
+- Simulate each race 1,000 times, locally, and store what the page needs as a static file. The page shows counts out of 1,000.
 - Every simulated ballot is a real ranking from the CVR, and every simulation goes through the real tabulator.
 - Every number on the page regenerates from a committed, seeded script.
-- Show how often each candidate wins a simulation, plus one dot per simulation, on separate lines for wins on first choices and wins after tabulation.
+- Show how many simulations each candidate wins, plus one dot per simulation, on separate lines for wins on first choices and wins after tabulation.
 - Report a share of simulations, never a chance of winning.
 
 ## Files
@@ -19,6 +19,7 @@ ballots still to be counted with copies of real ballots, runs the real tabulator
 | File | Role |
 |---|---|
 | `simulate_projection.mjs` | The simulation. Writes `site/static/data/alaska-rcv-2026/projection.json` |
+| `lib.mjs` | The random numbers and the sampler's binomial, shared with the other scripts |
 | `site/static/rcv-tabulate.js` | The tabulator, shared with the page and checked against 2024 by `validate_2024.mjs` |
 | `site/static/rcv-uncounted.js` | Uncounted and questioned estimates and the turnout ratio, shared with the page so they can't drift |
 | `site/static/rcv-measures.js` | Turns ballot measures into two-"candidate" contests, shared with the page |
@@ -32,16 +33,16 @@ ballots still to be counted with copies of real ballots, runs the real tabulator
 
 ```bash
 node simulate_projection.mjs site/static/data/alaska-rcv-2026 site/static/data/alaska-rcv-2026/projection.json \
-  --runs 100 --seed 20261104 --tau 0.2 --tau-local 0.28 --tau-party 0.2 --min-pool 300 --min-bucket 30
+  --runs 1000 --seed 20261104 --tau 0.2 --tau-local 0.28 --tau-party 0.2 --min-pool 300 --min-bucket 30
 ```
 
-It takes about 30 seconds and needs `ballots.json`, `contest-*.json`, `coverage.json`, `early-absentee-2024.json`,
+It takes about 70 seconds on a laptop and needs `ballots.json`, `contest-*.json`, `coverage.json`, `early-absentee-2024.json`,
 `questioned-2024.json` and `holdovers.json` in the data directory. Every flag is required. Any CVR refresh needs a rerun, and the page warns
 "Out of date" if `projection.json` was made from a different CVR file.
 
 | Flag | Value | Meaning |
 |---|---|---|
-| `--runs` | 100 | Simulations per race |
+| `--runs` | 1000 | Simulations per race |
 | `--seed` | 20261104 | Base seed. Each contest's generator starts from `seed ^ imul(id, 0x9e3779b1)`, so races don't depend on each other |
 | `--tau` | 0.2 | Standard deviation of the lean in statewide races and ballot measures |
 | `--tau-local` | 0.28 | The same in State House and Senate races |
@@ -233,8 +234,20 @@ an assumption, not a measurement of how much State House misses share. A bigger 
 - Overseas absentee voters, House District 99, aren't on non-federal contests, so their estimated ballots aren't placed in
   those races. Statewide races record them as `notOnBallot`.
 
-With 100 simulations, a win count near 80 has a standard error of about 4. A different seed has moved results by several
-wins, so small shifts mean nothing.
+With 1,000 simulations, a share of wins near 50% has a standard error of about 1.6 points, and near 80% about 1.3. So a different
+seed moves a close race by about 16 of 1,000, and small shifts mean nothing. At 100 simulations, the first version, ten
+different blocks gave House District 24's leader 41 to 64 wins of 100.
+
+## Drawing many ballots at once
+
+Copying a pool's ballots one at a time, as first written, costs a draw per ballot. Instead `Pool.drawInto` draws how many copies each
+ranking gets, in one pass: each ranking's count is Binomial(what's left to draw, its weight / the weight left), which is the same
+multinomial distribution. `binomial` in `lib.mjs` is exact: inversion when n times p is under 10, otherwise Hormann's BTRS.
+
+`tests/simulation.test.mjs` checks the binomial's mean, variance and full distribution against the exact probabilities, its edges,
+that every draw is allocated, and a pool against drawing one ballot at a time. Over the whole simulation, the two samplers were
+compared on 123 win counts at 1,000 runs: the largest |z| was 2.37, 5 were over 2 and none over 3, which is what chance gives.
+A run takes 9 seconds at 100 simulations and 71 at 1,000. One ballot at a time took 26 seconds at 100.
 
 ## Output
 
@@ -248,24 +261,38 @@ wins, so small shifts mean nothing.
     name, seats,
     races: [ { id, name, seat, hds, candidates: [ { letter, name, party } ] } ],
     notOnBallot: [ { seat, hds, name, party, until } ],           // holdovers.json
+    outcomes: [ [republican, democrat, other, tied, simulations] ],  // each seat split reached, most common first
   } },
   contests: { [id]: {
     name, tau,
     ballots: { cvr, hand, uncounted, questioned, notOnBallot },   // expected counts, rounded
     toppedUpPerRun: { hand, uncounted, questioned },              // ballots per simulation whose pool was filled up
     noLeanTargetPerRun: { [letter]: n },                          // pools per simulation with no ballots for that candidate
-    runs: [ { winner, round, votes, runnerUp, runnerUpVotes, continuing } ],   // the final round of each simulation
+    winners: { [letter]: {                                        // only candidates who won any simulation
+      wins,                                                       // out of parameters.runs
+      byRound: { [round]: [ share ] },                            // one per simulation won in that round, smallest first
+      medianShare,                                                // of the votes in the final count, over all its wins
+    } },
+    ties,                                                         // simulations out of parameters.runs with no winner
+    highShare,                                                    // the largest winning share in any simulation
   } }
 }
 ```
 
+`byRound` has the winner's share of the votes in the final count for every simulation they won, to 4 decimals, and the page draws one
+dot for each. A tied simulation is only counted. Sorting drops which simulation each share came from, but seat counts need each race's
+result from the same simulation, so `outcomes` is worked out first, and the page unpacks it to one entry per simulation. The file is
+354 KB, or 50 KB gzipped. Storing each simulation's votes and runner-up as well, for a fuller tooltip, would be 4.38 MB, or 412 KB gzipped.
+
 ## On the page
 
 - **Order.** After the map and the tabulation, in a tinted box tagged "Simulated", so the page reads as first choices, then transfers, then the ballots still to come. The rounds cover only ballots counted so far, so they can name a different leader, and the page says so. The line of numbers at the top gives the selected contest's largest win count.
-- **Table.** One row per candidate, sorted by wins: share of simulations, wins on first choices and after tabulation, median winning share.
+- **Table.** One row per candidate, sorted by wins: simulations won of 1,000, wins on first choices and after tabulation, median winning share.
 - **Plot.** One dot per simulation, at the winner's share of continuing ballots at the end of tabulation, on a line for first choices or tabulation.
-  The axis runs from 50% to the largest share in that race. Dots only shift up or down to avoid overlapping. Tooltips give votes.
-- **Candidates with no wins** are merged into one "0 of 100 wins" line under the plot.
+  The axis runs from 50% to the largest share in that race. Dots only shift up or down to avoid overlapping. Tooltips give the share and how it was won.
+- **Candidates with no wins** are merged into one "0 of 1,000 wins" line under the plot. A candidate who won even once has a dot and a count.
+- **Tight races.** A line's dots stack at most 96 pixels either side of it, so a tight race can't make the plot huge. Dots that don't fit are
+  left out, the counts still include them, and the note under the plot says so.
 - **Phones** get smaller dots, so the same shares don't stack as high.
 
 ## Checks
@@ -285,35 +312,38 @@ Run these after changing the simulation or its inputs:
 - **A vote-count axis** on the plot, the first version. Votes didn't show how close a win was.
 - **Statewide races only,** the first version, before every race and measure.
 - **Statewide questioned counts in local races.** About 2.7 times too high.
-- **Storing each run's lean and first round,** dropped to keep `projection.json` at about 447 KB.
+- **Storing each run's lean and first round,** dropped to keep `projection.json` small.
+- **100 simulations,** the first version. Close races' win counts moved by about 10 between seeds.
+- **Dots from the first 100 or 150 simulations.** A winner in 1% of simulations has a 22% chance of none among the first 150.
+- **Scaling counts to 100, with one chosen dot per 10 simulations.** A dot that stands for 10 simulations was confusing, and rare
+  winners and losers needed "under 1" and "over 99".
 
 ## Results as of the CVR posted 2026-11-05T00:24:43Z
 
-Wins out of 100, from the committed `projection.json`. Rerun rather than quoting these after a refresh. This CVR has the same
+Wins out of 1,000, from the committed `projection.json`. Rerun rather than quoting these after a refresh. This CVR has the same
 ballots as the one posted 2026-11-04T11:42:46Z: only the summary and the ballots received moved.
 
 | Race | Wins | Top candidate's wins, seeds 1, 2 and 3 |
 |---|---|---|
-| U.S. Senator | Peltola 89, Sullivan (Dan S.) 11 | 91, 87, 87 |
-| U.S. Representative | Begich 86, Hill 14 | 92, 91, 93 |
-| Governor | Kreiss-Tomkins 100 | 100, 100, 100 |
-| Ballot Measure 2 | No 100 | 97, 99, 99 |
-| Ballot Measure 3 | Yes 100 | 100, 100, 100 |
-| House District 37 | Trefon 76, Smith 14, Wilson 10, with 2% of its simulated ballots from the CVR | 79, 80, 74 |
-| House District 29 | Nelson 55, Menard 45 | Nelson 54, Nelson 61, Menard 51 |
-| House District 24 | McCarty 58, Wall 42 | McCarty 55, Wall 51, McCarty 51 |
-| House District 30 | McCabe 66, Massie 34 | 62, 62, 59 |
-| House District 28 | Moore 63, Wright 37 | 60, 60, 68 |
+| U.S. Senator | Peltola 878, Sullivan (Dan S.) 122 | 857, 850, 859 |
+| U.S. Representative | Begich 886, Hill 114 | 865, 867, 888 |
+| Governor | Kreiss-Tomkins 1,000 | 1,000, 1,000, 1,000 |
+| Ballot Measure 2 | No 989, Yes 11 | 991, 992, 989 |
+| Ballot Measure 3 | Yes 1,000 | 1,000, 1,000, 1,000 |
+| House District 37 | Trefon 788, Smith 136, Wilson 75, with 2% of its simulated ballots from the CVR | 781, 784, 764 |
+| House District 29 | Nelson 507, Menard 490 | 547, 548, 534 |
+| House District 24 | McCarty 524, Wall 476 | 526, 506, 519 |
+| House District 30 | McCabe 565, Massie 434 | 553, 575, 570 |
+| House District 28 | Moore 616, Wright 383 | 614, 592, 591 |
 
-The last four are the closest, and none has a firm leader. Across those seeds House Districts 24 and 29 changed leader. House
-Districts 28 and 30 kept theirs, with 59 to 68 wins, but with the same arguments seeds 11 to 16 give Moore 57 to 65 and McCabe 48 to
-59, so wins in a race this close move by about 10 between seeds.
+The last four are the closest. All four kept their leader across these seeds, but House Districts 24 and 29 are close enough that a
+leader of 506 to 548 says very little: treat them as even.
 
-Seats, by party registration, as the median and the lowest and highest of the 100 simulations:
+Seats, by party registration, as the median and the lowest and highest of the 1,000 simulations:
 
 | Chamber | Republican | Democrat | Nonpartisan and others |
 |---|---|---|---|
-| State House, 40 seats | 16 (14 to 18) | 17 (15 to 18) | 7 (5 to 9) |
+| State House, 40 seats | 16 (13 to 20) | 17 (15 to 19) | 7 (4 to 9) |
 | State Senate, 20 seats | 11 (11) | 8 (8) | 1 (1) |
 
 Seeds 1, 2 and 3 give the same medians.

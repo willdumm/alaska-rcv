@@ -2,10 +2,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { measureContest, measuresIn } from "../site/static/rcv-measures.js";
 import { GROUP } from "../site/static/rcv-rows.js";
 import { MIN_BUCKET, projectedBallots } from "../site/static/rcv-projected.js";
 import { tabulate } from "../site/static/rcv-tabulate.js";
+import { everyContest } from "../scripts/lib.mjs";
 
 const data = new URL("../site/static/data/alaska-rcv-2026/", import.meta.url).pathname;
 const load = (name) => JSON.parse(readFileSync(data + name, "utf8"));
@@ -18,6 +18,10 @@ function contest(rows) {
 }
 const project = (c, votes) => projectedBallots(c, (l) => votes[l] ?? {});
 const count = (ballots) => Object.fromEntries(ballots);
+
+test("the page copies rankings with the same minimum as the simulation", () => {
+  assert.equal(MIN_BUCKET, load("projection.json").parameters.minBucket);
+});
 
 test("extra votes follow the district's Election Day ballots with that first choice", () => {
   const c = contest([["AB", 1, ED, 30], ["AC", 1, ED, 10], ["AC", 1, EARLY, 60]]);
@@ -55,7 +59,7 @@ test("a ballot past a blank or write-in first rank is left out, and one reaching
 
 test("round 1 equals the Division's summary in every contest, by district", () => {
   const index = load("ballots.json"), coverage = load("coverage.json");
-  const all = [...index.contests.map(({ id }) => load(`contest-${id}.json`)), ...measuresIn(index).map((m) => measureContest(m, index.measures))];
+  const all = everyContest(data, index);
   assert.equal(all.length, 55);
   for (const c of all) {
     const summary = coverage.contests[c.summaryName ?? c.name];

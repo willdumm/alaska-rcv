@@ -1,0 +1,23 @@
+# The Division overwrites its files at the same URLs, so a missed update is gone. This saves each one as a prerelease and opens an
+# issue. A person still builds, checks, releases and deploys. A failed run emails whoever last changed this schedule.
+name: watch
+on:
+  schedule:
+    # Not on the hour, when GitHub is most likely to drop a scheduled run.
+    - cron: "17 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: watch
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: bash scripts/watch_action.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}

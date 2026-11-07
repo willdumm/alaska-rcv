@@ -56,6 +56,7 @@ for (const [name, viewport] of WIDTHS) {
         updated: document.getElementById("rcv-updated").textContent,
         firstChart: document.getElementById("rcv-map").getBoundingClientRect().top < document.getElementById("rcv-flow").getBoundingClientRect().top,
         callouts: document.querySelectorAll("#rcv-callouts .rcv-callout").length,
+        dotReach: Math.max(0, ...[...document.querySelectorAll("#rcv-projection svg circle")].map((dot) => Math.abs(dot.getAttribute("cy")))),
         text: document.querySelector("main").innerText,
       };
     });
@@ -68,6 +69,7 @@ for (const [name, viewport] of WIDTHS) {
     if (!seen.map) fail("no map");
     if (!seen.firstChart) fail("the map isn't first");
     if (seen.callouts > 1) fail(`${seen.callouts} warnings above the rounds`);
+    if (seen.dotReach > 96) fail(`dots stack ${seen.dotReach}px from their line`);
     if (/Loading|Couldn't/.test(seen.updated)) fail(`status says "${seen.updated}"`);
     if (!/preliminary/i.test(seen.text) || !/unofficial/i.test(seen.text)) fail("doesn't say preliminary and unofficial");
     await page.close();
@@ -208,7 +210,7 @@ for (const chamber of ["senate", "house"]) {
   await page.close();
 }
 // The summary's links go to their charts, below the sticky filters.
-for (const [text, target] of [["see the flow chart", "#rcv-flow"], ["see the simulation", "#projection"]]) {
+for (const [text, target] of [["see the ranked choice tabulation", "#rcv-flow"], ["see the simulation", "#projection"]]) {
   const { page } = await opened(context, base);
   await page.getByRole("link", { name: text }).click();
   await page.waitForFunction(() => scrollY > 0);

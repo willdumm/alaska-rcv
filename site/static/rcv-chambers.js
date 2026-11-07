@@ -1,9 +1,10 @@
 // The State House and Senate as wholes: seats by party, from the races in projection.json and the seats not on the ballot.
 // The page, the tests and scripts/simulate_projection.mjs share this file. Nothing here touches the DOM or d3.
+export const PARTY_COLORS = { republican: "#e34948", democrat: "#2a78d6", other: "#eda100" };
 export const PARTY_GROUPS = [
-  { key: "republican", name: "Republican", color: "#e34948" },
-  { key: "democrat", name: "Democrat", color: "#2a78d6" },
-  { key: "other", name: "Nonpartisan and others", color: "#eda100" },
+  { key: "republican", name: "Republican", color: PARTY_COLORS.republican },
+  { key: "democrat", name: "Democrat", color: PARTY_COLORS.democrat },
+  { key: "other", name: "Nonpartisan and others", color: PARTY_COLORS.other },
 ];
 
 export function partyGroup(registration = "") {
@@ -41,6 +42,10 @@ export function rankedOutcomes(perRun) {
   }
   return [...outcomes.values()].sort((a, b) => b.count - a.count);
 }
+
+// What projection.json stores of a chamber's seats, the same splits as rows: [republican, democrat, other, tied, simulations].
+export const outcomeRows = (perRun) => rankedOutcomes(perRun).map(({ seats, count }) => [seats.republican, seats.democrat, seats.other, seats.tied, count]);
+export const runsFromOutcomes = (rows) => rows.flatMap(([republican, democrat, other, tied, count]) => Array.from({ length: count }, () => ({ republican, democrat, other, tied })));
 
 // Which house districts each State Senate seat covers: A is House Districts 1 and 2, B is 3 and 4, and so on.
 export const senateDistricts = (letter) => {

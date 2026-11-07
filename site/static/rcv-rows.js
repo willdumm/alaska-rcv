@@ -3,6 +3,8 @@
 // manifest by extract_cvr.py.
 export const GROUP = { ELECTION_DAY: 1, ABSENTEE: 2, EARLY: 3, QUESTIONED: 4 };
 
+export const sum = (values) => values.reduce((a, b) => a + b, 0);
+
 export function* eachRow(c) {
   const { rows } = c;
   for (let i = 0; i < rows.length; i += 4) {

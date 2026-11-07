@@ -14,6 +14,12 @@ hourly, compares the three files' `Last-Modified` and the table's "Table last up
 snapshot to `STORE/TIME/` when any has changed. It writes nothing to this repo and publishes nothing. A file posted during a
 download shows up as a change next run, so that run's snapshot is the complete one: build the newest for each posting.
 
+`.github/workflows/watch.yml` runs that hourly on GitHub through `scripts/watch_action.sh`. A new snapshot becomes a prerelease named
+`watch-TIME`, with its files and `seen`, and an issue; the newest such release's `seen` is the next run's state, so a repo with none
+saves once. It builds nothing: a person follows "Refreshing results" from those files. `division-tls-intermediate.pem` is the
+intermediate from the AIA URL, public, and good until June 2029. A failed run emails whoever last changed the schedule, and GitHub
+turns scheduled runs off after 60 days with no activity in the repo.
+
 ## Earlier versions
 
 The page has one version per update from the Division: a complete data directory at `site/static/data/alaska-rcv-2026/versions/ID/`,
@@ -46,7 +52,7 @@ nix shell nixpkgs#nodejs nixpkgs#poppler-utils nixpkgs#unzip -c bash
    That total includes the table's questioned ballots (143 on November 4) and special needs ballots (286). `build_coverage.py`
    reads the questioned row from the saved table, stops if the table's total differs from `received.json`'s, and records the row
    in `coverage.json`. Uncounted ballots leave it out, because the questioned estimate already covers those ballots.
-3. `bash scripts/refresh.sh build RAW_DIR site/static/data/alaska-rcv-2026` (about 10 minutes) extracts the CVR, then rebuilds
+3. `bash scripts/refresh.sh build RAW_DIR site/static/data/alaska-rcv-2026` (about 4 minutes) extracts the CVR, then rebuilds
    `ballots.json`, the contest files, `coverage.json` and `projection.json`, using the CVR's `Last-Modified` and download time
    from its saved headers. It then checks the simulation's arithmetic and the vote totals.
    Same inputs give a byte-identical `projection.json`. Once the CVR includes questioned ballots (group 4), the simulation only

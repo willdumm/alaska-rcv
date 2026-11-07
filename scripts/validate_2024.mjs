@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tabulate } from "../site/static/rcv-tabulate.js";
 import { ballotCounts } from "../site/static/rcv-rows.js";
+import { loadContest, readJson } from "./lib.mjs";
 
 const number = (s) => Number(s.replace(/,/g, ""));
 // A long name wraps in the reports, putting its quoted nickname and percentage on the next line.
@@ -28,14 +29,14 @@ function parseReport(path) {
 }
 
 const dir = process.argv[2];
-const { contests } = JSON.parse(readFileSync(join(dir, "ballots.json"), "utf8"));
+const { contests } = readJson(join(dir, "ballots.json"));
 const firstRoundMajorities = [];
 const needsRcv = new Set();
 let failures = 0;
 let checked = 0;
 
 function load(id) {
-  const c = JSON.parse(readFileSync(join(dir, `contest-${id}.json`), "utf8"));
+  const c = loadContest(dir, id);
   return { ...c, ballots: ballotCounts(c), letters: c.candidates.map((x) => x.letter) };
 }
 

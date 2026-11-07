@@ -6,13 +6,13 @@
 // moves one's share by about 25 * sqrt(2) * tau points. That finalists' reading is the one to compare with
 // tau. The rms of z reads low with two big candidates, since one's gain is the other's loss.
 // Usage: node calibrate_lean_2024.mjs EXTRACTED_2024_DIR
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { readBallot, tabulate } from "../site/static/rcv-tabulate.js";
-import { GROUP, ballotCounts, eachRow } from "../site/static/rcv-rows.js";
+import { readBallot } from "../site/static/rcv-tabulate.js";
+import { GROUP, eachRow } from "../site/static/rcv-rows.js";
+import { finalists, loadContest, readJson } from "./lib.mjs";
 
 const dir = process.argv[2];
-const { contests } = JSON.parse(readFileSync(join(dir, "ballots.json"), "utf8"));
+const { contests } = readJson(join(dir, "ballots.json"));
 const COMPARISONS = [
   { label: "absentee from early", from: GROUP.EARLY, to: GROUP.ABSENTEE },
   { label: "questioned from Election Day", from: GROUP.ELECTION_DAY, to: GROUP.QUESTIONED },
@@ -45,14 +45,8 @@ function predict(tally, from, to) {
   return { actual, predicted };
 }
 
-function finalists(c) {
-  const { rounds } = tabulate(ballotCounts(c), c.letters, [], { ignoreMajority: true });
-  const last = rounds[rounds.length - 1].votes;
-  return c.letters.slice().sort((a, b) => last[b] - last[a]).slice(0, 2);
-}
-
 function load(id) {
-  const c = JSON.parse(readFileSync(join(dir, `contest-${id}.json`), "utf8"));
+  const c = loadContest(dir, id);
   return { ...c, letters: c.candidates.map((x) => x.letter) };
 }
 

@@ -19,9 +19,17 @@ base=https://www.elections.alaska.gov/enr/26GENR/results
 received_page=https://www.elections.alaska.gov/election-results/e/
 files=(CVR_Export.zip ElectionSummaryReportRPT.pdf GA_ENR_Precinct_State_of_Alaska.csv)
 
-iso() { date -u -d "$1" +%Y-%m-%dT%H:%M:%SZ; }
+# date reads an empty string as today at midnight, so a missing header has to stop here.
+iso() { [ -n "$1" ] || { echo "PROBLEM: a time is missing from the Division's response headers" >&2; return 1; }; date -u -d "$1" +%Y-%m-%dT%H:%M:%SZ; }
 header() { tr -d '\r' < "$2" | awk -v name="$1:" 'tolower($1) == name { $1 = ""; print substr($0, 2) }' | tail -1; }
 modified() { iso "$(header last-modified "$1/CVR_Export.zip.headers")"; }
+# A failed request fails this, so it can't look like a file that changed.
+live_modified() { curl -fsSI --max-time 60 --cacert "$1" "$2" | header last-modified /dev/stdin; }
+
+# Every number here decides the result. reproduce reads them back from the committed file instead.
+sim_settings=(--seed 20261104 --tau 0.2 --tau-local 0.28 --tau-party 0.2 --min-pool 300 --min-bucket 30)
+# A field of a JSON file. Fields are read as data: nothing from the file is ever run.
+json_field() { node -p "process.argv[2].split('.').reduce((o, k) => o[k], JSON.parse(require('fs').readFileSync(process.argv[1])))" "$1" "$2"; }
 
 fetch() {
   local raw=$1 cacert=$2
@@ -38,9 +46,10 @@ table_stamp() { sed -n 's/.*Table last updated \([^<]*\)\..*/\1/p' "$1" | head -
 
 # What's posted now, one line per file. A page with no table text still gets saved, once, for a person to look at.
 posted() {
-  local cacert=$1 table=$2 file
+  local cacert=$1 table=$2 file stamp
   for file in "${files[@]}"; do
-    echo "$file $(curl -fsSI --max-time 60 --cacert "$cacert" "$base/$file" | tr -d '\r' | awk 'tolower($1) == "last-modified:" { $1 = ""; print substr($0, 2) }')"
+    stamp=$(live_modified "$cacert" "$base/$file") || return 1
+    echo "$file $stamp"
   done
   echo "table $(table_stamp "$table")"
 }
@@ -70,27 +79,31 @@ watch() {
 }
 
 build() {
-  local raw=$1 data=$2
+  local raw=$1 data=$2 posted_at fetched_at
   [ -s "$raw/received.json" ] || node "$here/received_from_table.mjs" "$raw/ballots-received-table.html" > "$raw/received.json"
   test -s "$raw/ballots-received-table.html" || grep -q '"questionedNote"' "$raw/received.json" || { echo "No $raw/ballots-received-table.html: see scripts/README.md" >&2; exit 1; }
   raw=$(cd "$raw" && pwd)
   data=$(cd "$data" && pwd)
+  posted_at=$(modified "$raw")
+  fetched_at=$(iso "$(header date "$raw/CVR_Export.zip.headers")")
   rm -rf "$raw/cvr"
   mkdir "$raw/cvr"
   unzip -q "$raw/CVR_Export.zip" -d "$raw/cvr"
   pdftotext -layout "$raw/ElectionSummaryReportRPT.pdf" "$raw/summary.txt"
-  ( cd "$raw" && "$python" -I "$here/extract_cvr.py" "$raw/cvr" "$data" )
-  ( cd "$raw" && "$python" -I "$here/build_coverage.py" "$raw/summary.txt" "$raw/GA_ENR_Precinct_State_of_Alaska.csv" "$data/ballots.json" \
-      "$raw/received.json" "$raw/ballots-received-table.html" "$(modified "$raw")" "$(iso "$(header date "$raw/CVR_Export.zip.headers")")" "$data/coverage.json" )
-  node "$here/simulate_projection.mjs" "$data" "$data/projection.json" --runs 100 --seed 20261104 --tau 0.2 --tau-local 0.28 --tau-party 0.2 --min-pool 300 --min-bucket 30
+  "$python" -I "$here/extract_cvr.py" "$raw/cvr" "$data"
+  # About 1 GB, and the zip it came from is kept.
+  rm -rf "$raw/cvr"
+  "$python" -I "$here/build_coverage.py" "$raw/summary.txt" "$raw/GA_ENR_Precinct_State_of_Alaska.csv" "$data/ballots.json" \
+    "$raw/received.json" "$raw/ballots-received-table.html" "$posted_at" "$fetched_at" "$data/coverage.json"
+  node "$here/simulate_projection.mjs" "$data" "$data/projection.json" --runs 1000 "${sim_settings[@]}"
   local throwaway
   throwaway=$(mktemp)
-  node "$here/simulate_projection.mjs" "$data" "$throwaway" --runs 1 --seed 20261104 --tau 0.2 --tau-local 0.28 --tau-party 0.2 --min-pool 300 --min-bucket 30 --hand-only
+  node "$here/simulate_projection.mjs" "$data" "$throwaway" --runs 1 "${sim_settings[@]}" --hand-only
   rm -f "$throwaway"
   node "$here/check_counts.mjs" "$data"
   cat <<NEXT
 
-Rebuilt from the CVR posted $(modified "$raw"). By hand, from here (scripts/README.md has each):
+Rebuilt from the CVR posted $posted_at. By hand, from here (scripts/README.md has each):
 - Reread the page's caveats in site/content/_index.md.
 - From November 18, compare the Division's round-by-round reports.
 - Run: refresh.sh keep $data $data, refresh.sh archive $raw $data, then refresh.sh check $data CACERT.
@@ -115,12 +128,14 @@ check() {
   node --test "$root"/tests/*.test.mjs > /dev/null || { echo "PROBLEM: tests fail: run npm test"; problems=1; }
   node "$here/check_counts.mjs" "$data" || problems=1
   reproduce "$data" || problems=1
-  live=$(iso "$(curl -fsSI --cacert "$cacert" "$base/CVR_Export.zip" | tr -d '\r' | awk 'tolower($1) == "last-modified:" { $1 = ""; print substr($0, 2) }')")
-  read -r built simulated < <(node -p "const read = (f) => JSON.parse(require('fs').readFileSync(process.argv[1] + '/' + f)).cvrLastModified; read('coverage.json') + ' ' + read('projection.json')" "$data")
+  versions "$data" || problems=1
+  live=$(iso "$(live_modified "$cacert" "$base/CVR_Export.zip")")
+  built=$(json_field "$data/coverage.json" cvrLastModified)
+  simulated=$(json_field "$data/projection.json" cvrLastModified)
   curl -fsS --max-time 60 --cacert "$cacert" -o "$page" "$received_page"
-  table=$(node -p "JSON.parse(process.argv[1]).asOf" "$(node "$here/received_from_table.mjs" "$page")")
+  table=$(node "$here/received_from_table.mjs" "$page" | node -p "JSON.parse(require('fs').readFileSync(0)).asOf")
   rm -f "$page"
-  asof=$(node -p "JSON.parse(require('fs').readFileSync(process.argv[1] + '/coverage.json')).received.asOf" "$data")
+  asof=$(json_field "$data/coverage.json" received.asOf)
   [ "$table" = "$asof" ] || { echo "PROBLEM: the Division's received table is from $table, and coverage.json has $asof: refresh first"; problems=1; }
   [ "$live" = "$built" ] || { echo "PROBLEM: the Division's CVR was posted $live, and coverage.json has $built: refresh first"; problems=1; }
   [ "$simulated" = "$built" ] || { echo "PROBLEM: projection.json used the CVR posted $simulated, and coverage.json has $built"; problems=1; }
@@ -130,19 +145,20 @@ check() {
 
 # The newest version also sits in DATA_DIR, as the page's default, so versions/ repeats it and it isn't simulated twice.
 versions() {
-  local data=$1 dir newest
-  newest=$(node -p "JSON.parse(require('fs').readFileSync(process.argv[1] + '/versions.json')).versions[0].id" "$data")
+  local data=$1 dir newest problems=0
+  newest=$(json_field "$data/versions.json" versions.0.id)
   for dir in "$data"/versions/*/; do
     [ "$(basename "$dir")" = "$newest" ] && continue
     echo "Version $(basename "$dir"):"
-    node "$here/check_counts.mjs" "$dir"
-    reproduce "$dir"
+    node "$here/check_counts.mjs" "$dir" || problems=1
+    reproduce "$dir" || problems=1
   done
+  return "$problems"
 }
 
 archive() {
   local raw=$1 built=$2 release names
-  release=snapshot-$(node --input-type=module -e "import { versionId } from '$here/build_versions.mjs'; import { readFileSync } from 'node:fs'; console.log(versionId(JSON.parse(readFileSync(process.argv[1] + '/coverage.json'))))" "$built")
+  release=snapshot-$(node "$here/build_versions.mjs" --id "$built")
   names=$(find "$raw" -maxdepth 1 -type f ! -name summary.txt -printf '%f\n' | sort)
   (cd "$raw" && sha256sum $names) | sed "s|  |  $release/|" >> "$root/sources.sha256"
   cat <<NEXT
@@ -151,16 +167,18 @@ gh release create $release $(echo $names) --notes-file NOTES -R willdumm/alaska-
 NEXT
 }
 
+usage() { sed -n 2,10p "$0"; exit 2; }
 command=${1:-}
 [ $# -gt 0 ] && shift
+needs() { [ "$1" = "$2" ] || usage; }
 case "$command" in
-  watch) [ $# = 2 ] && watch "$@" ;;
-  fetch) [ $# = 2 ] && fetch "$@" ;;
-  build) [ $# = 2 ] && build "$@" ;;
-  keep) [ $# = 2 ] && node "$here/build_versions.mjs" "$@" ;;
-  versions) [ $# = 1 ] && versions "$@" ;;
-  check) [ $# = 2 ] && check "$@" ;;
-  reproduce) [ $# = 1 ] && reproduce "$@" ;;
-  archive) [ $# = 2 ] && archive "$@" ;;
-  *) sed -n 2,9p "$0"; exit 2 ;;
+  watch) needs $# 2; watch "$@" ;;
+  fetch) needs $# 2; fetch "$@" ;;
+  build) needs $# 2; build "$@" ;;
+  keep) needs $# 2; node "$here/build_versions.mjs" "$@" ;;
+  versions) needs $# 1; versions "$@" ;;
+  check) needs $# 2; check "$@" ;;
+  reproduce) needs $# 1; reproduce "$@" ;;
+  archive) needs $# 2; archive "$@" ;;
+  *) usage ;;
 esac

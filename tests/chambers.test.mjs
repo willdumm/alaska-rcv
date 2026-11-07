@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { partyGroup, rankedOutcomes, seatsPerRun, senateDistricts, senateSeatOf } from "../site/static/rcv-chambers.js";
+import { outcomeRows, partyGroup, rankedOutcomes, runsFromOutcomes, seatsPerRun, senateDistricts, senateSeatOf } from "../site/static/rcv-chambers.js";
 
 const projection = JSON.parse(readFileSync(new URL("../site/static/data/alaska-rcv-2026/projection.json", import.meta.url)));
 
@@ -14,7 +14,7 @@ for (const [key, seats] of [["house", 40], ["senate", 20]]) {
     assert.deepEqual(hds, Array.from({ length: 40 }, (_, i) => i + 1));
   });
   test(`${key}: seats add up in every simulation`, () => {
-    const perRun = seatsPerRun(projection.chambers[key], projection);
+    const perRun = runsFromOutcomes(projection.chambers[key].outcomes);
     assert.equal(perRun.length, projection.parameters.runs);
     for (const s of perRun) assert.equal(s.republican + s.democrat + s.other + s.tied, seats);
   });
@@ -37,6 +37,13 @@ test("seat splits count whole simulations, most common first", () => {
   const a = { republican: 2, democrat: 1, other: 0, tied: 0 }, b = { republican: 1, democrat: 2, other: 0, tied: 0 };
   const outcomes = rankedOutcomes([a, b, { ...b }]);
   assert.deepEqual(outcomes.map((o) => [o.seats, o.count]), [[b, 2], [a, 1]]);
+});
+
+test("the stored seat splits unpack to the same simulations, in the same order", () => {
+  const a = { republican: 2, democrat: 1, other: 0, tied: 0 }, b = { republican: 1, democrat: 2, other: 0, tied: 0 };
+  const rows = outcomeRows([a, b, { ...b }]);
+  assert.deepEqual(rows, [[1, 2, 0, 0, 2], [2, 1, 0, 0, 1]]);
+  assert.deepEqual(rankedOutcomes(runsFromOutcomes(rows)).map((o) => [o.seats, o.count]), [[b, 2], [a, 1]]);
 });
 
 test("every house district belongs to the Senate seat that covers it", () => {

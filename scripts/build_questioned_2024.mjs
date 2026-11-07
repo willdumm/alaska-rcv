@@ -3,15 +3,16 @@
 // turnout with 2026. Only 4,041 had a House race, against 11,031 for U.S. Representative. The districts haven't
 // changed since 2024. 2024's State Senate races were in different districts, so Senate races use the House counts.
 // Usage: node build_questioned_2024.mjs EXTRACTED_2024_DIR OUT.json
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { GROUP, eachRow } from "../site/static/rcv-rows.js";
+import { loadContest, readJson } from "./lib.mjs";
 
 const [dir, output] = process.argv.slice(2);
-const { contests } = JSON.parse(readFileSync(join(dir, "ballots.json"), "utf8"));
+const { contests } = readJson(join(dir, "ballots.json"));
 
 function addCounts(id, wanted, into) {
-  for (const { hd, group, count } of eachRow(JSON.parse(readFileSync(join(dir, `contest-${id}.json`), "utf8")))) {
+  for (const { hd, group, count } of eachRow(loadContest(dir, id))) {
     if (group === wanted) into[hd] = (into[hd] || 0) + count;
   }
 }

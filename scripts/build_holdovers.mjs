@@ -3,17 +3,17 @@
 // tabulator, which reproduces the certified 2024 reports. So this can't see a resignation, appointment or party change since:
 // docs/RULES.md says what was checked by hand.
 // Usage: node build_holdovers.mjs EXTRACTED_2024_DIR OUT.json
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, writeFileSync } from "node:fs";
 import { senateDistricts } from "../site/static/rcv-chambers.js";
 import { ballotCounts, eachRow } from "../site/static/rcv-rows.js";
 import { tabulate } from "../site/static/rcv-tabulate.js";
+import { loadContest } from "./lib.mjs";
 
 const [dir, output] = process.argv.slice(2);
 if (!dir || !output) throw new Error("Usage: node build_holdovers.mjs EXTRACTED_2024_DIR OUT.json");
 const senate = [];
 for (const file of readdirSync(dir).filter((name) => /^contest-\d+\.json$/.test(name))) {
-  const c = JSON.parse(readFileSync(join(dir, file), "utf8"));
+  const c = loadContest(dir, file.match(/\d+/)[0]);
   const match = c.name.match(/^Senate District ([A-T])$/);
   if (!match) continue;
   const seat = match[1], hds = senateDistricts(seat);

@@ -1,11 +1,13 @@
 // Keeps a built data directory as one of the page's versions, and rewrites the list of them.
 // Usage: node build_versions.mjs BUILT_DIR DATA_DIR
+//        node build_versions.mjs --id BUILT_DIR   Print the build's version ID, and do nothing else
 // Copies BUILT_DIR to DATA_DIR/versions/ID/ and writes DATA_DIR/versions.json. BUILT_DIR can be DATA_DIR itself. Each version
 // has every file the page and the simulation read, so the tools need no special case. Files that don't change between versions
 // cost nothing: git and Cloudflare both store identical files once.
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { readJson } from "./lib.mjs";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -51,8 +53,6 @@ export function manifestEntry(coverage) {
   };
 }
 
-const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
-
 function keep(built, data) {
   const id = versionId(readJson(join(built, "coverage.json")));
   const target = join(data, "versions", id);
@@ -74,6 +74,10 @@ function writeManifest(data) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  if (process.argv[2] === "--id") {
+    console.log(versionId(readJson(join(process.argv[3], "coverage.json"))));
+    process.exit(0);
+  }
   const [built, data] = process.argv.slice(2).map((path) => resolve(path));
   if (!existsSync(join(built, "coverage.json")) || !data) throw new Error("usage: build_versions.mjs BUILT_DIR DATA_DIR");
   const id = keep(built, data);

@@ -21,7 +21,8 @@ This project is heavily AI agent assisted: Claude Code wrote much of the code an
   pre-deploy check.
 - `scripts/SIMULATION.md`: the simulated projection's method, assumptions and evidence.
 - `tests/`: unit and fixture tests (`npm test`), and a browser check of every contest (`npm run smoke`).
-  `.github/workflows/test.yml` runs them with the checks that don't need the raw CVR.
+  `.github/workflows/test.yml` runs them with the checks that don't need the raw CVR. `.github/workflows/watch.yml` saves each
+  update from the Division: see `scripts/README.md`.
 - `SOURCES.md`: the raw files behind the data, kept as GitHub Release assets.
 
 It's a [Hugo](https://gohugo.io) site in `site/`, built into `public/` (gitignored) and served by a

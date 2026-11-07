@@ -7,15 +7,13 @@
 // - The CVR's first-rank marks can't exceed the summary's votes: the summary has everything the CVR has, and more.
 // - They must equal them in a district whose ballots are all in the CVR: nothing there was counted by hand.
 // Exits with an error if either fails. It also prints how many votes the count's round 1 has beyond the summary.
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { readBallot } from "../site/static/rcv-tabulate.js";
-import { measureContest, measuresIn } from "../site/static/rcv-measures.js";
 import { eachRow } from "../site/static/rcv-rows.js";
+import { add, everyContest, readJson } from "./lib.mjs";
 
 const dir = process.argv[2];
-const load = (name) => JSON.parse(readFileSync(join(dir, name), "utf8"));
-const index = load("ballots.json"), coverage = load("coverage.json");
+const index = readJson(join(dir, "ballots.json")), coverage = readJson(join(dir, "coverage.json"));
 
 const METHODS = ["ed", "ab", "ev", "q", "rm"];
 const fullyScanned = new Set(Object.entries(coverage.districts)
@@ -25,9 +23,8 @@ const fullyScanned = new Set(Object.entries(coverage.districts)
 const problems = [];
 let cells = 0, exact = 0, beyondSummary = 0;
 const racesBeyond = new Set();
-const add = (map, key, n) => map.set(key, (map.get(key) || 0) + n);
-const everyContest = [...index.contests.map(({ id }) => load(`contest-${id}.json`)), ...measuresIn(index).map((m) => measureContest(m, index.measures))];
-for (const c of everyContest) {
+const contests = everyContest(dir, index);
+for (const c of contests) {
   const summary = coverage.contests[c.summaryName ?? c.name];
   if (!summary) { problems.push(`${c.name}: not in the summary`); continue; }
   const letters = new Set(c.candidates.map((x) => x.letter));
@@ -54,7 +51,7 @@ for (const c of everyContest) {
     }
   }
 }
-console.log(`${everyContest.length} contests, ${cells} candidate and district counts, ${exact} of them in the ${fullyScanned.size} fully scanned districts.`);
+console.log(`${contests.length} contests, ${cells} candidate and district counts, ${exact} of them in the ${fullyScanned.size} fully scanned districts.`);
 console.log(`Round 1 has ${beyondSummary} votes beyond the summary, in ${racesBeyond.size} races, from ballots past a blank or write-in first rank.`);
 problems.slice(0, 30).forEach((p) => console.log(`PROBLEM ${p}`));
 console.log(`${problems.length} problems`);

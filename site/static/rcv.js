@@ -5,7 +5,7 @@ import { tabulate } from "./rcv-tabulate.js";
 import { ballotCounts } from "./rcv-rows.js";
 import { measureContest, measuresIn } from "./rcv-measures.js";
 import { $, alaskaTime, el, fmt, hideTip, pct, strong } from "./rcv-dom.js";
-import { INACTIVE_COLOR, ballotsLeft, ballotsLeftInContest, countedBallots, coverage, districtName, districtShares, districts, index, knownRankings, majorityIn, parseStamp, placesOf, prepareContest, projection, readRanking, roundTen, setData, summaryEntry, summaryFor } from "./rcv-model.js";
+import { INACTIVE_COLOR, LOW_RANKINGS, ballotsLeft, ballotsLeftInContest, countedBallots, coverage, districtName, districtShares, districts, index, knownRankings, majorityIn, ofRuns, parseStamp, placesOf, prepareContest, projection, readRanking, roundTen, setData, summaryEntry, summaryFor } from "./rcv-model.js";
 import { renderFlow } from "./rcv-flow.js";
 import { renderProjection } from "./rcv-projection.js";
 import { drawMap, paintMap, renderCoverage, renderDots, renderMapLegend, renderMapMode, setLastShares, windAllRings } from "./rcv-districts.js";
@@ -45,7 +45,6 @@ function renderStatus() {
   $("rcv-updated-detail").textContent = `The Division's results, with ${report.precinctsReported} of ${report.precinctsTotal} precincts and ${fmt(report.votersCast)} ballots. Scanned ballots posted ${alaskaTime(new Date(cvrLastModified))}. Ballots received as of ${received.asOf}. Last checked ${alaskaTime(new Date(fetched))}.`;
 }
 
-const LOW_RANKINGS = 0.5;
 
 // The one line of numbers above the map: first choices, the rounds, the simulations, and what's left.
 function renderSummary(c, result) {
@@ -61,12 +60,12 @@ function renderSummary(c, result) {
   const last = result.rounds[result.rounds.length - 1];
   if (result.rounds.length > 1 && last.active) {
     const [top, next] = d3.sort(c.letters, (l) => -last.votes[l]);
-    tiles.push(tile("Current result after tabulation", named(top, last.votes, last.active), `${named(next, last.votes, last.active)}, if counting stopped now.`, { href: "#rcv-flow", text: "see the flow chart" }));
+    tiles.push(tile("Current result after tabulation", named(top, last.votes, last.active), `${named(next, last.votes, last.active)}, if counting stopped now.`, { href: "#rcv-flow", text: "see the ranked choice tabulation" }));
   }
   const sim = projection.contests[c.id];
   if (sim) {
-    const [name, wins] = d3.greatest(c.letters.map((l) => [c.byLetter[l].short, sim.runs.filter((r) => r.winner === l).length]), ([, n]) => n);
-    tiles.push(tile(`Simulated final outcomes${whole ? "" : ", whole contest"}`, `${name} ${wins} of ${projection.parameters.runs}`, "a share of simulations, not a chance of winning.", { href: "#projection", text: "see the simulation" }));
+    const top = d3.greatest(c.letters, (l) => sim.winners[l]?.wins ?? 0);
+    tiles.push(tile(`Simulated final outcomes${whole ? "" : ", whole contest"}`, `${c.byLetter[top].short} ${ofRuns(sim.winners[top]?.wins ?? 0)}`, "a share of simulations, not a chance of winning.", { href: "#projection", text: "see the simulation" }));
   }
   const left = whole ? ballotsLeftInContest(c) : ballotsLeft(c, state.hd);
   tiles.push(tile("Ballots left to count", `about ${fmt(roundTen(left.total))}`, "estimated: not yet counted, or questioned"));

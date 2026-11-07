@@ -79,8 +79,9 @@ main > section#rcv-about { padding: 8px 0 12px; border-top: 0; }
 #rcv-about li { margin-bottom: 2px; }
 .rcv-status p { margin: 0; }
 .rcv-status .rcv-version-picker { margin-top: 8px; }
-.rcv-version-picker label { display: flex; flex-direction: column; max-width: 760px; font-size: 13px; font-weight: 600; color: var(--muted); }
-.rcv-version-picker select { width: 100%; min-height: 38px; padding: 4px 8px; border: 1px solid #c7ccd2; border-radius: 6px; background: var(--bg); color: var(--text); font: 400 15px var(--font); }
+.rcv-version-picker label, .rcv-filters label { display: flex; flex-direction: column; font-size: 13px; font-weight: 600; color: var(--muted); }
+.rcv-version-picker label { max-width: 760px; }
+.rcv-version-picker select, .rcv-filters select { width: 100%; min-height: 38px; padding: 4px 8px; border: 1px solid #c7ccd2; border-radius: 6px; background: var(--bg); color: var(--text); font: 400 15px var(--font); }
 .rcv-status #rcv-version-note { margin-top: 6px; }
 .rcv-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 24px; margin: 8px 0; }
 .rcv-tiles div { min-width: 0; }
@@ -89,8 +90,7 @@ main > section#rcv-about { padding: 8px 0 12px; border-top: 0; }
 .rcv-tiles dd small { display: block; font-size: 13px; line-height: 1.35; font-weight: 400; color: var(--muted); }
 
 .rcv-filters { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: end; gap: 8px 16px; margin: 0 -16px; padding: 10px 16px; border-top: 1px solid var(--border); background: var(--bg); }
-.rcv-filters label { display: flex; flex-direction: column; flex: 1 1 150px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
-.rcv-filters select { width: 100%; min-height: 38px; padding: 4px 8px; border: 1px solid #c7ccd2; border-radius: 6px; background: var(--bg); color: var(--text); font: 400 15px var(--font); }
+.rcv-filters label { flex: 1 1 150px; min-width: 0; }
 .rcv-filters button { min-height: 38px; font-size: 15px; }
 .rcv-filters select.narrowed { border: 2px solid #d9730d; background: #fdebd9; color: #7a3e00; font-weight: 600; }
 .rcv-district-warning { flex: 1 1 100%; margin: 0; padding: 8px 12px; border-left: 3px solid #d9730d; background: #fdebd9; font-size: 14px; line-height: 1.5; }
