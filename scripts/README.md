@@ -84,21 +84,22 @@ unless it finds districts 1 to 40 beside the right senate seats.
 
 ## Boundaries
 
-From the shapes behind the Division's results map, https://www.elections.alaska.gov/enr/26GENR/:
+From the Alaska Redistricting Board's May 2023 proclamation,
+https://www.akredistrict.org/files/8316/8421/0002/2023-May-Final-Proclamation.zip (SHA-256 `03203b191b1303b55fa8a88e3dd62ccd86657ef4f8bae22eba0c59053529202a`). Its shapefile has no
+attribute table, so the districts are numbered by record order. On November 6, 2026, each record overlapped the same-numbered
+district in the shapes behind the Division's results map (https://www.elections.alaska.gov/enr/26GENR/shapes/districts.js) more
+than any other, by area.
+
+The proclamation's shapes run past the coast, so they're clipped to the Census Bureau's 1:500,000 outline of Alaska, which
+removes about 203,000 km² of sea and leaves 0.25 km² of land outside any district. This needs
+`mapshaper` on the path (0.6.113: `npm i mapshaper@0.6.113`). The outline comes from
+https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_us_state_500k.zip. With both extracted:
 
 ```bash
-curl -O https://www.elections.alaska.gov/enr/26GENR/shapes/districts.js
-node build_districts.mjs districts.js raw-districts.geojson
+bash build_coast_clip.sh 2023-May-Final-Proclamation.shp cb_2024_us_state_500k.shp site/static/data/alaska-rcv-2026/districts.geojson
 ```
 
-Those shapes run far past the coast, so they're clipped to the Census Bureau's 1:500,000 outline of Alaska, which
-removes about 267,000 km² of sea and leaves 94 km² of land outside any district, all thin slivers. This needs
-`mapshaper` on the path (0.6.113: `npm i mapshaper@0.6.113`). The `.shp` comes from
-https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_us_state_500k.zip, extracted:
-
-```bash
-bash build_coast_clip.sh raw-districts.geojson cb_2024_us_state_500k.shp site/static/data/alaska-rcv-2026/districts.geojson
-```
+Every version in `versions/` has a copy of the same file.
 
 The favicon comes from those districts, and also needs `mapshaper`:
 

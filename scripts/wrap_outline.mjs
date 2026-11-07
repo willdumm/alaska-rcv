@@ -1,5 +1,5 @@
-// Moves the western Aleutians in a GeoJSON outline past -180, as build_districts.mjs does for the districts,
-// so both are on the same side of the antimeridian and the outline doesn't cross the map.
+// Moves the western Aleutians in a GeoJSON file past -180, for both the districts and the state outline,
+// so they're on the same side of the antimeridian and nothing crosses the map.
 // Usage: node wrap_outline.mjs IN.geojson OUT.geojson
 import { readFileSync, writeFileSync } from "node:fs";
 

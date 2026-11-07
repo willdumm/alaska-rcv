@@ -1,5 +1,6 @@
 ---
-title: Alaska 2026 ranked-choice explorer
+title: Alaska 2026 General Election
+subtitle: ranked choice results explorer
 description: An unofficial, preliminary look at Alaska's 2026 general election, from the Division of Elections' posted results. Not affiliated with the State of Alaska.
 ---
 

@@ -1,5 +1,5 @@
 // The district views: the list of districts, the coverage table, and the map.
-import { $, el, fmt, hideTip, pct, showTip, strong, withTip } from "./rcv-dom.js";
+import { $, addPlates, el, fmt, hideTip, pct, showTip, strong, withTip } from "./rcv-dom.js";
 import { MIDDLE, MARGIN_BREAKS, ballotsLeft, ballotsLeftInContest, coverage, districtBallots, districtName, districts, isStatewide, lowCoverage, placesOf, roundTen } from "./rcv-model.js";
 import { senateSeatOf } from "./rcv-chambers.js";
 import { actions, currentContest as current, state } from "./rcv-state.js";
@@ -158,11 +158,11 @@ export function renderCoverage(c, shares) {
 // Map
 
 // Alaska Albers for the whole state. Each inset turns the same projection to its own meridian, so north
-// stays up. Each one's bounds are [[west, south], [east, north]].
+// stays up. Each one's bounds are [[west, south], [east, north]], the least it has to show: its box keeps its shape, so it may show more.
 const INSETS = [
-  { name: "Anchorage and Mat-Su", bounds: [[-150.3, 61.03], [-148.9, 61.75]] },
+  { name: "Anchorage and Mat-Su", bounds: [[-150.3, 61.09], [-148.9, 61.67]] },
   { name: "Fairbanks", bounds: [[-148.1, 64.65], [-146.9, 65.0]] },
-  { name: "Kenai", bounds: [[-152.2, 59.4], [-148.8, 61.0]] },
+  { name: "Kenai", bounds: [[-152.03, 59.13], [-148.5, 61.09]] },
   { name: "Southeast", bounds: [[-141, 54.2], [-129.9, 60.4]] },
 ];
 // The state map stops here, so it can be wider. Islands wholly west of it are left out.
@@ -171,7 +171,10 @@ const albers = (meridian) => d3.geoConicEqualArea().parallels([55, 65]).rotate([
 const LABEL_FITS = { width: 18, height: 13 };
 // A seat's letter is narrower than a district's number.
 const SEAT_LABEL_FITS = { width: 9, height: 9 };
+// The map's district and seat labels are off: hovering a district names it.
+const SHOW_MAP_LABELS = false;
 const OFF_BALLOT = "#f1f2f4";
+const SMALL_OUTLINE = 25;
 export const windAllRings = () => { for (const f of districts.features) windRings(f.geometry); };
 
 // d3 reads a ring's direction as which side is inside, so a ring running the other way would cover the
@@ -212,6 +215,8 @@ function labelPoint(geometry) {
   return [(left + right) / 2, lat];
 }
 
+const overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
 // One panel of the map: every district's shape and, where it fits, its number. With `seatOf`, the label is instead one per
 // seat, on the seat's biggest district in this panel that has room.
 function drawPanel(parent, projection, width, height, { features = districts.features, seatOf = null } = {}) {
@@ -234,20 +239,40 @@ function drawPanel(parent, projection, width, height, { features = districts.fea
     const room = seatOf ? SEAT_LABEL_FITS : LABEL_FITS;
     return x1 - x0 >= room.width && y1 - y0 >= room.height && x > 8 && x < width - 8 && y > 8 && y < height - 8;
   };
-  const fitting = seatOf
+  const fitting = !SHOW_MAP_LABELS ? [] : (seatOf
     ? d3.groups(features.filter(fits), (f) => seatOf(f.properties.hd)).map(([, members]) => d3.greatest(members, (f) => path.area(f)))
-    : features.filter(fits);
-  const labels = svg.append("g").selectAll("text").data(fitting).join("text")
-    .attr("class", "district-label").attr("text-anchor", "middle")
+    : features.filter(fits)).sort((p, q) => path.area(q) - path.area(p));
+  const labelLayer = svg.append("g");
+  const labels = labelLayer.selectAll("g").data(fitting).join("g").attr("class", "district-label");
+  labels.append("text").attr("text-anchor", "middle")
     .attr("x", (f) => projection(labelPoint(f.geometry))[0]).attr("y", (f) => projection(labelPoint(f.geometry))[1] + 4)
     .text((f) => (seatOf ? seatOf(f.properties.hd) : f.properties.hd));
-  return { svg, shapes, labels };
+  labels.call(addPlates, 2, 0);
+  // Where a district's label would overlap another, the larger district keeps its label. Every seat keeps its letter.
+  const placed = [];
+  if (!seatOf) labels.filter(function () {
+    const box = this.getBBox();
+    if (placed.some((other) => overlaps(box, other))) return true;
+    placed.push(box);
+    return false;
+  }).remove();
+  return { svg, shapes, labels: labelLayer.selectAll(".district-label"), labelLayer };
 }
 
 // The inset's whole rectangle, as the state map's outline of what it shows.
 function insetOutline(projection, width, height) {
   const corners = [[0, 0], [width, 0], [width, height], [0, height], [0, 0]];
   return { type: "LineString", coordinates: corners.map((point) => projection.invert(point)) };
+}
+
+// A label would hide most of a small inset's outline, so it moves to just below one.
+function clearSmallOutlines(labels, outlines) {
+  const small = outlines.filter(([[x0, y0], [x1, y1]]) => x1 - x0 < SMALL_OUTLINE && y1 - y0 < SMALL_OUTLINE);
+  labels.each(function () {
+    const box = this.getBBox();
+    const hit = small.find(([[x0, y0], [x1, y1]]) => overlaps(box, { x: x0, y: y0, width: x1 - x0, height: y1 - y0 }));
+    if (hit) this.setAttribute("transform", `translate(0,${hit[1][1] + 3 - box.y})`);
+  });
 }
 
 // Charts are sized to their boxes, so this draws again only when the box's width changes, or a contest
@@ -286,7 +311,7 @@ export function drawMap() {
     insets.append(figure);
     const insetWidth = figure.clientWidth, insetHeight = Math.round(insetWidth * 0.85);
     const projection = albers((west + east) / 2)
-      .fitExtent([[2, 2], [insetWidth - 2, insetHeight - 2]], { type: "MultiPoint", coordinates: [[west, south], [(west + east) / 2, south], [east, south], [east, north], [(west + east) / 2, north], [west, north]] });
+      .fitSize([insetWidth, insetHeight], { type: "MultiPoint", coordinates: [[west, south], [(west + east) / 2, south], [east, south], [east, north], [(west + east) / 2, north], [west, north]] });
     const outline = insetOutline(projection, insetWidth, insetHeight);
     projection.clipExtent([[0, 0], [insetWidth, insetHeight]]);
     return { figure, projection, insetWidth, insetHeight, outline };
@@ -300,8 +325,10 @@ export function drawMap() {
   mapPanels = [drawPanel(stateBox, whole, width, height, { features, seatOf })];
   for (const { figure, projection, insetWidth, insetHeight, outline } of views) {
     mapPanels.push(drawPanel(figure, projection, insetWidth, insetHeight, { seatOf }));
-    mapPanels[0].svg.append("path").attr("class", "inset-outline").attr("d", d3.geoPath(whole)(outline));
+    for (const line of ["inset-casing", "inset-outline"]) mapPanels[0].svg.append("path").attr("class", line).attr("d", d3.geoPath(whole)(outline));
   }
+  mapPanels[0].labelLayer.raise();
+  clearSmallOutlines(mapPanels[0].labels, views.map((v) => d3.geoPath(whole).bounds(v.outline)));
 }
 
 export function highlightDistricts(hds) {

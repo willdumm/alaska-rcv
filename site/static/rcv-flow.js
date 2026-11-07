@@ -1,10 +1,51 @@
 // The rounds chart: ribbons of ballots between rounds, one row per candidate.
-import { $, el, fmt, pct, withTip } from "./rcv-dom.js";
+import { $, addPlates, fmt, pct, withTip } from "./rcv-dom.js";
 import { INACTIVE_COLOR, majorityIn } from "./rcv-model.js";
 
 function ribbonPath(x0, x1, y0a, y0b, y1a, y1b) {
   const mid = (x0 + x1) / 2;
   return `M${x0},${y0a}C${mid},${y0a} ${mid},${y1a} ${x1},${y1a}L${x1},${y1b}C${mid},${y1b} ${mid},${y0b} ${x0},${y0b}Z`;
+}
+
+// What happened in a round, in words: who was eliminated and where their ballots went, or how the count ended.
+export function roundStory(c, { rounds }, i) {
+  const round = rounds[i];
+  const name = (l) => c.byLetter[l].short;
+  if (round.eliminated) {
+    const moved = round.transfers;
+    const parts = c.order.filter((l) => moved[l] >= 0.5).map((l) => `${fmt(moved[l])} to ${name(l)}`);
+    const stopped = (moved.exhausted || 0) + (moved.overvotes || 0);
+    if (stopped >= 0.5) parts.push(`${fmt(stopped)} stopped counting`);
+    return `${name(round.eliminated)} has the fewest votes (${fmt(round.votes[round.eliminated])}) and is eliminated: ${parts.join(", ") || "no ballots to move"}.`;
+  }
+  const out = new Set(rounds.map((r) => r.eliminated));
+  const standing = c.order.filter((l) => !out.has(l)).sort((p, q) => round.votes[q] - round.votes[p]);
+  const [a, b] = standing;
+  const opening = rounds.length > 1 ? "Two candidates remain, so the count ends. " : c.measure ? "" : standing.length > 2 ? `${name(a)} has over half of the first choices, so the count ends. ` : "With two candidates, no one is eliminated. ";
+  if (b === undefined) return `${opening}${name(a)} has all ${fmt(round.votes[a])} votes.`;
+  if (Math.abs(round.votes[a] - round.votes[b]) < 0.5) return `${opening}${name(a)} and ${name(b)} are tied, at ${fmt(round.votes[a])} each.`;
+  return `${opening}${name(a)} leads ${name(b)} by ${fmt(round.votes[a] - round.votes[b])} votes, ${pct(round.votes[a], round.active)} to ${pct(round.votes[b], round.active)}.`;
+}
+
+// Below the chart, each round's story hangs from its line. When one level's columns would be too narrow, the rounds alternate
+// between two levels, each twice as wide, with the lines of the lower level running through the gaps in the upper one.
+const STORY_WIDTH = 150, STORY_GAP = 12, STORY_LINE = 17;
+function storyLayout(rounds, width, x, wrapped, storyOf) {
+  const step = rounds.length > 1 ? x(1) - x(0) : width;
+  const levels = step - STORY_GAP < STORY_WIDTH ? 2 : 1;
+  const reach = (levels * step) / 2;
+  const blocks = rounds.map((round, i) => {
+    const left = Math.max(0, x(i) - reach + (i ? STORY_GAP / 2 : 0));
+    const right = Math.min(width, x(i) + reach - (i < rounds.length - 1 ? STORY_GAP / 2 : 0));
+    return { left, level: i % levels, lines: wrapped(storyOf(i), right - left) };
+  });
+  let top = 10;
+  for (let level = 0; level < levels; level++) {
+    const members = blocks.filter((b) => b.level === level);
+    for (const b of members) b.top = top;
+    top += (d3.max(members, (b) => b.lines.length) ?? 0) * STORY_LINE + 8;
+  }
+  return { blocks, height: top };
 }
 
 export function renderFlow(c, result) {
@@ -28,9 +69,9 @@ export function renderFlow(c, result) {
   measure.font = `600 13px ${getComputedStyle(box).fontFamily}`;
   const textWidth = (text) => measure.measureText(text).width;
   const fitted = (...options) => options.find((text) => textWidth(text) <= width) ?? options[options.length - 1];
-  const wrapped = (text) => text.split(" ").reduce((lines, word) => {
+  const wrapped = (text, limit = width) => text.split(" ").reduce((lines, word) => {
     const last = lines[lines.length - 1];
-    if (last && textWidth(`${last} ${word}`) <= width) lines[lines.length - 1] = `${last} ${word}`;
+    if (last && textWidth(`${last} ${word}`) <= limit) lines[lines.length - 1] = `${last} ${word}`;
     else lines.push(word);
     return lines;
   }, []);
@@ -68,7 +109,9 @@ export function renderFlow(c, result) {
     lanes.set(l, { top: nextY, mid: nextY + nameHeight + body / 2, index: lanes.size });
     nextY += nameHeight + body + 6;
   }
-  const height = nextY;
+  const plotBottom = nextY;
+  const stories = storyLayout(rounds, width, x, wrapped, (i) => roundStory(c, result, i));
+  const height = plotBottom + stories.height;
 
   const rows = rounds.map((round, i) => {
     const out = new Set(rounds.slice(0, i).map((r) => r.eliminated));
@@ -143,7 +186,7 @@ export function renderFlow(c, result) {
 
   // Once a candidate has a majority, the rest of the count fades back.
   if (won && won.round < rounds.length - 1) {
-    svg.append("rect").attr("class", "decided").attr("x", x(won.round)).attr("y", plotTop).attr("width", width - x(won.round)).attr("height", height - plotTop);
+    svg.append("rect").attr("class", "decided").attr("x", x(won.round)).attr("y", plotTop).attr("width", width - x(won.round)).attr("height", plotBottom - plotTop);
   }
 
   verdict.forEach((line, j) => {
@@ -153,24 +196,32 @@ export function renderFlow(c, result) {
   for (const row of rows) {
     const { i, round } = row;
     svg.append("line").attr("class", won?.round === i ? "round-line deciding" : "round-line")
-      .attr("x1", x(i)).attr("x2", x(i)).attr("y1", plotTop - 4).attr("y2", height);
+      .attr("x1", x(i)).attr("x2", x(i)).attr("y1", plotTop - 4).attr("y2", plotBottom + stories.blocks[i].top - 4);
     const heading = svg.append("text").attr("x", x(i)).attr("text-anchor", "middle");
     heading.append("tspan").attr("x", x(i)).attr("y", plotTop - 24).attr("class", won && i > won.round ? "dim" : "strong").text(c.measure ? "The vote" : `Round ${i + 1}`);
     heading.append("tspan").attr("x", x(i)).attr("y", plotTop - 9).attr("class", "dim").text(roundDetail(round));
   }
 
+  for (const { left, top, lines } of stories.blocks) {
+    const story = svg.append("text").attr("text-anchor", rounds.length === 1 ? "middle" : null);
+    lines.forEach((line, n) => story.append("tspan").attr("x", rounds.length === 1 ? width / 2 : left).attr("y", plotBottom + top + 13 + n * STORY_LINE).text(line));
+  }
+
   for (const l of keys) {
-    svg.append("text").attr("class", "flow-name halo").attr("x", 0).attr("y", lanes.get(l).top + 13).append("tspan").attr("class", "strong").text(nameOf(l));
+    const name = svg.append("g").attr("class", "flow-name");
+    name.append("text").attr("x", 3).attr("y", lanes.get(l).top + 13).append("tspan").attr("class", "strong").text(nameOf(l));
+    name.call(addPlates, 3, 0);
   }
 
   for (const row of rows) {
     const { i, round } = row;
     const labels = svg.append("g").attr("class", "flow-labels").selectAll("g").data([...row.segments.values()]).join("g");
     const at = (d, dy) => lanes.get(d.l).mid + dy;
-    labels.filter((d) => d.l !== "stopped").append("text").attr("class", "share halo").attr("x", x(i)).attr("y", (d) => at(d, -3)).attr("text-anchor", "middle")
+    labels.filter((d) => d.l !== "stopped").append("text").attr("class", "share").attr("x", x(i)).attr("y", (d) => at(d, -3)).attr("text-anchor", "middle")
       .text((d) => pct(d.votes, round.active));
-    labels.append("text").attr("class", "dim halo").attr("x", x(i)).attr("y", (d) => at(d, d.l === "stopped" ? 4 : 12)).attr("text-anchor", "middle").text((d) => fmt(d.votes));
-    labels.filter((d) => statusOf(d.l, i)).append("text").attr("class", "halo").attr("x", x(i)).attr("y", (d) => at(d, 27)).attr("text-anchor", "middle")
-      .append("tspan").attr("class", (d) => (won?.round === i && won.letter === d.l ? "strong" : "dim")).text((d) => statusOf(d.l, i));
+    labels.append("text").attr("x", x(i)).attr("y", (d) => at(d, d.l === "stopped" ? 4 : 12)).attr("text-anchor", "middle").text((d) => fmt(d.votes));
+    labels.filter((d) => statusOf(d.l, i)).append("text").attr("x", x(i)).attr("y", (d) => at(d, 27)).attr("text-anchor", "middle")
+      .append("tspan").attr("class", (d) => (won?.round === i && won.letter === d.l ? "strong" : "")).text((d) => statusOf(d.l, i));
+    labels.call(addPlates, 4, 1);
   }
 }

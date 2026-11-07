@@ -13,7 +13,7 @@
     <link rel="canonical" href="{{ $url }}">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="{{ site.Title }}">
-    <meta property="og:title" content="{{ .Title }}">
+    <meta property="og:title" content="{{ cond .IsHome site.Title .Title }}">
     <meta property="og:description" content="{{ .Description | default site.Params.description }}">
     <meta property="og:url" content="{{ $url }}">
     {{- end }}

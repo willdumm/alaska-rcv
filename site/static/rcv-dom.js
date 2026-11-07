@@ -20,6 +20,17 @@ export function el(tag, props = {}, ...children) {
 }
 export const strong = (text) => el("strong", {}, text);
 
+// A solid plate behind each group's text, so it reads on any fill. Each group has to be on the page already, to be measured.
+export function addPlates(groups, padX = 4, padY = 2) {
+  groups.insert("rect", ":first-child").attr("class", "plate").attr("rx", 3).each(function () {
+    const { x, y, width, height } = this.parentNode.getBBox();
+    this.setAttribute("x", x - padX);
+    this.setAttribute("y", y - padY);
+    this.setAttribute("width", width + 2 * padX);
+    this.setAttribute("height", height + 2 * padY);
+  });
+}
+
 const tip = () => $("rcv-tip");
 export function showTip(event, value, ...lines) {
   const node = tip();

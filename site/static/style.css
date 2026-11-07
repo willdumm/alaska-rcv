@@ -129,7 +129,7 @@ main > section.rcv-section-sim { --bg: #fdf8ea; margin: 32px -16px 0; padding: 3
 .rcv-chart svg [tabindex]:focus-visible { outline: 2px solid var(--link); outline-offset: -1px; }
 .rcv-chart svg text.share { font-size: 18px; font-weight: 700; fill: var(--heading); }
 .rcv-chart svg.compact text.share { font-size: 15px; }
-.rcv-chart svg text.halo { paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; }
+.rcv-chart svg .plate { fill: var(--bg); }
 .rcv-chart svg tspan.strong { font-weight: 600; fill: var(--heading); }
 .rcv-chart svg tspan.dim { fill: var(--muted); }
 .rcv-chart .flows { opacity: .5; }
@@ -162,8 +162,8 @@ main > section.rcv-section-sim { --bg: #fdf8ea; margin: 32px -16px 0; padding: 3
 .rcv-table .total th, .rcv-table .total td { font-weight: 600; color: var(--heading); }
 .rcv-table .left { text-align: left; white-space: normal; min-width: 180px; }
 .rcv-table button.link { font-weight: 600; }
-.rcv-transfers { max-width: 46em; margin: 14px 0 0; padding-left: 1.2em; font-size: 15px; line-height: 1.5; }
-.rcv-transfers li { margin-bottom: 4px; }
+/* The flow chart draws these. An SVG image's text doesn't reach a screen reader, so the list stays for one. */
+.rcv-transfers { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; overflow: hidden; clip-path: inset(50%); }
 
 .rcv-drill { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 20px; align-items: start; }
 .rcv-level h3 { margin: 0 0 8px; font-size: 15px; line-height: 1.35; }
@@ -188,9 +188,12 @@ button.rcv-choice[aria-pressed="true"] { border-color: var(--heading); backgroun
 #rcv-map .district.hovered { stroke: #111418; stroke-width: 1.5; }
 #rcv-map .district.selected { stroke: #111418; stroke-width: 2.5; }
 #rcv-map .district:focus-visible { outline: none; stroke: var(--link); stroke-width: 2.5; }
-#rcv-map .district-label { font-size: 12px; fill: #111418; paint-order: stroke; stroke: #fff; stroke-width: 2.5px; stroke-linejoin: round; pointer-events: none; }
-#rcv-map .district-label.off-ballot { fill: #a9b0b8; }
-#rcv-map .inset-outline { fill: none; stroke: #111418; stroke-width: 1; pointer-events: none; }
+#rcv-map .district-label { pointer-events: none; }
+#rcv-map .district-label text { font-size: 12px; font-weight: 600; fill: #111418; }
+#rcv-map .district-label .plate { fill: #fff; }
+#rcv-map .district-label.off-ballot text { fill: var(--muted); font-weight: 400; }
+#rcv-map .inset-casing { fill: none; stroke: #fff; stroke-width: 4; pointer-events: none; }
+#rcv-map .inset-outline { fill: none; stroke: #111418; stroke-width: 2; pointer-events: none; }
 .rcv-map-insets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .rcv-map-insets figure { min-width: 0; margin: 0; }
 .rcv-map-insets figcaption { margin-bottom: 4px; font-size: 13px; font-weight: 600; color: var(--muted); }

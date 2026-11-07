@@ -6,7 +6,7 @@ import { ballotCounts } from "./rcv-rows.js";
 import { measureContest, measuresIn } from "./rcv-measures.js";
 import { $, alaskaTime, el, fmt, hideTip, pct, strong } from "./rcv-dom.js";
 import { INACTIVE_COLOR, LOW_RANKINGS, ballotsLeft, ballotsLeftInContest, countedBallots, coverage, districtName, districtShares, districts, index, knownRankings, majorityIn, ofRuns, parseStamp, placesOf, prepareContest, projection, readRanking, roundTen, setData, summaryEntry, summaryFor } from "./rcv-model.js";
-import { renderFlow } from "./rcv-flow.js";
+import { renderFlow, roundStory } from "./rcv-flow.js";
 import { renderProjection } from "./rcv-projection.js";
 import { drawMap, paintMap, renderCoverage, renderDots, renderMapLegend, renderMapMode, setLastShares, windAllRings } from "./rcv-districts.js";
 import { actions, currentContest, state } from "./rcv-state.js";
@@ -162,15 +162,8 @@ function renderRounds(table, c, result, full) {
 }
 
 function renderTransfers(c, result) {
-  const items = result.rounds.filter((r) => r.eliminated).map((r) => {
-    const i = result.rounds.indexOf(r) + 1;
-    const moved = r.transfers;
-    const parts = c.order.filter((l) => moved[l] >= 0.5).map((l) => `${fmt(moved[l])} to ${c.byLetter[l].short}`);
-    const stopped = (moved.exhausted || 0) + (moved.overvotes || 0);
-    if (stopped >= 0.5) parts.push(`${fmt(stopped)} stopped counting`);
-    return el("li", {}, `Round ${i}: `, strong(c.byLetter[r.eliminated].short), ` has the fewest votes (${fmt(r.votes[r.eliminated])}) and is eliminated: ${parts.join(", ") || "no ballots to move"}.`);
-  });
-  $("rcv-transfers").replaceChildren(...items);
+  const drawn = result.rounds[0].active > 0 && c.letters.length > 1;
+  $("rcv-transfers").replaceChildren(...(drawn ? result.rounds.map((r, i) => el("li", {}, `Round ${i + 1}: ${roundStory(c, result, i)}`)) : []));
 }
 
 // Drill-down

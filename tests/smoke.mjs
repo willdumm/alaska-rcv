@@ -50,6 +50,7 @@ for (const [name, viewport] of WIDTHS) {
         overflow: document.documentElement.scrollWidth - innerWidth,
         past: past.slice(0, 3).map((el) => `${el.tagName}.${el.getAttribute("class") ?? ""}`),
         flow: Boolean(document.querySelector("#rcv-flow svg")),
+        flowText: document.querySelector("#rcv-flow svg")?.textContent ?? "",
         oneCandidate: document.getElementById("rcv-count-intro").textContent.includes("one candidate"),
         rounds: document.querySelectorAll("#rcv-rounds tbody tr").length,
         map: document.querySelectorAll("#rcv-map path.district").length,
@@ -65,6 +66,7 @@ for (const [name, viewport] of WIDTHS) {
     if (seen.overflow > 0) fail(`page scrolls sideways by ${seen.overflow}px`);
     if (seen.past.length) fail(`past the edge: ${seen.past.join(", ")}`);
     if (seen.flow === seen.oneCandidate) fail(seen.flow ? "a rounds chart for one candidate" : "no rounds chart");
+    if (seen.flow && !/leads|tied|has all/.test(seen.flowText)) fail("the rounds chart doesn't say how the count ended");
     if (!seen.rounds) fail("no rounds table");
     if (!seen.map) fail("no map");
     if (!seen.firstChart) fail("the map isn't first");
@@ -144,7 +146,7 @@ for (const [what, pattern] of BROKEN) {
   await context.unroute(pattern);
 }
 // A whole chamber: no rounds chart, every district painted, and seats that add up in every simulation.
-for (const [chamber, seats] of [["senate", 20], ["house", 40]]) {
+for (const chamber of ["senate", "house"]) {
   const { page, errors } = await opened(context, `${base}?contest=${chamber}`);
   const seen = await page.evaluate(() => ({
     flow: document.getElementById("count").offsetParent !== null,
@@ -161,8 +163,7 @@ for (const [chamber, seats] of [["senate", 20], ["house", 40]]) {
   const contested = projection.chambers[chamber].races.filter((race) => race.candidates.length > 1).length;
   if (seen.rows !== contested) problems.push(`${chamber}: ${seen.rows} rows in the seat list, not ${contested}`);
   if (seen.outcomes < 1 || seen.outcomes > 5) problems.push(`${chamber}: ${seen.outcomes} seat splits listed`);
-  if (chamber === "senate" && seen.labels.length !== seats) problems.push(`senate: map labels ${seen.labels.join()}, not one per seat`);
-  if (chamber === "senate" && seen.labels.some((l) => !/^[A-T]$/.test(l))) problems.push(`senate: map labels ${seen.labels.join()}`);
+  if (seen.labels.length) problems.push(`${chamber}: map labels ${seen.labels.join()}, which are turned off`);
   if (seen.table !== 3) problems.push(`${chamber}: ${seen.table} rows in the seats table`);
   if (!/preliminary/i.test(seen.text) || !/unofficial/i.test(seen.text)) problems.push(`${chamber}: doesn't say preliminary and unofficial`);
   await page.check('input[name="rcv-map-mode"][value="final"]');

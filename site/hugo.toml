@@ -1,5 +1,5 @@
 baseURL = "https://alaska-rcv.dummthings.dev/"
-title = "Alaska 2026 ranked-choice explorer"
+title = "Alaska 2026 General Election: ranked choice results explorer"
 locale = "en-us"
 # Built into ../public, which wrangler serves as static assets (see wrangler.jsonc).
 publishDir = "../public"

@@ -1,4 +1,4 @@
-# Alaska 2026 ranked-choice explorer
+# Alaska 2026 General Election: ranked choice results explorer
 
 An unofficial, preliminary look at Alaska's 2026 general election at
 https://alaska-rcv.dummthings.dev. It projects the ranked-choice rounds in the browser, from the Division

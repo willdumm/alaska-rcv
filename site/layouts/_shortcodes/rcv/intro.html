@@ -1,6 +1,6 @@
 {{- /* The page's opening: its title from the front matter, then a byline and a link to the code. */ -}}
 <div class="prose rcv-intro">
-<h1>{{ .Page.Title }}</h1>
+<h1>{{ .Page.Title }}{{ with .Page.Params.subtitle }}<br>{{ . }}{{ end }}</h1>
 <div class="rcv-intro-meta">
 {{- with .Get "repo" }}
 <a class="rcv-repo" href="{{ . }}">Code and data on GitHub</a>
