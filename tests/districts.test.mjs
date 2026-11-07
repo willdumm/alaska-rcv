@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { districtShares, placesOf, prepareContest, setData, summaryFor, swarm } from "../site/static/rcv-model.js";
+import { districtLines, districtShares, placesOf, prepareContest, setData, summaryFor, swarm } from "../site/static/rcv-model.js";
 
 const data = (name) => JSON.parse(readFileSync(new URL(`../site/static/data/alaska-rcv-2026/${name}`, import.meta.url)));
 const index = data("ballots.json");
@@ -18,6 +18,18 @@ test("every house district has its name from the Division's form, and the overse
   assert.equal(placesOf(3), "Mendenhall Valley/Haines/Skagway/Gustavus");
   assert.equal(placesOf(36), "Copper River Basin/Delta/Tok/Yukon Drainage");
   assert.equal(placesOf(99), "");
+});
+
+test("the map's borders are the edges two districts share, and its coast the rest, once each", () => {
+  const square = (x) => ({ geometry: { type: "Polygon", coordinates: [[[x, 0], [x + 1, 0], [x + 1, 1], [x, 1], [x, 0]]] } });
+  const touching = districtLines([square(0), square(1)]);
+  assert.deepEqual(touching.borders.coordinates, [[[1, 0], [1, 1]]]);
+  assert.deepEqual(touching.coast.coordinates, [[[0, 0], [1, 0]], [[1, 1], [0, 1], [0, 0]], [[1, 0], [2, 0], [2, 1], [1, 1]]]);
+  assert.deepEqual(districtLines([square(0), square(5)]).borders.coordinates, []);
+  const edges = ({ coordinates }) => coordinates.reduce((sum, line) => sum + line.length - 1, 0);
+  const { borders, coast } = districtLines(data("districts.geojson").features);
+  assert.equal(edges(borders), 4815);
+  assert.equal(edges(coast), 25708);
 });
 
 test("first choices: the leader has the most votes, as a share of every candidate's", () => {

@@ -274,6 +274,26 @@ for (const [text, target] of [["see the ranked choice tabulation", "#rcv-flow"],
   if (errors.length) problems.push(`tapping: ${errors.join("; ")}`);
   await phone.close();
 }
+// A mouse moving off a district to open water takes the tooltip and the highlight with it.
+{
+  const { page } = await opened(context, base);
+  const map = page.locator("#rcv-map .rcv-map-state svg");
+  await map.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(200);
+  const box = await map.boundingBox();
+  const water = await page.evaluate(({ x, y, width, height }) => {
+    for (let v = 0.98; v > 0.5; v -= 0.01) for (let u = 0.6; u < 0.98; u += 0.01) {
+      if (document.elementFromPoint(x + u * width, y + v * height)?.tagName === "svg") return { x: x + u * width, y: y + v * height };
+    }
+  }, box);
+  await page.mouse.move(box.x + box.width * 0.45, box.y + box.height * 0.15);
+  if (!(await page.locator("#rcv-tip").isVisible())) problems.push("hovering a district shows no tooltip");
+  await page.mouse.move(water.x, water.y, { steps: 10 });
+  await page.waitForTimeout(100);
+  if (await page.locator("#rcv-tip").isVisible()) problems.push("the map's tooltip stays up after the mouse leaves");
+  if (await page.locator("#rcv-map path.hovered").count()) problems.push("a district stays lit after the mouse leaves");
+  await page.close();
+}
 const stamp = /coverage\.json/;
 await context.route(stamp, async (route) => {
   const response = await route.fetch();

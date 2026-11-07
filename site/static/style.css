@@ -185,10 +185,13 @@ button.rcv-choice[aria-pressed="true"] { border-color: var(--heading); backgroun
 .rcv-districts { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; align-items: start; }
 @media (max-width: 760px) { .rcv-districts { grid-template-columns: 1fr; } }
 #rcv-map svg { display: block; max-width: 100%; height: auto; overflow: hidden; font-family: var(--font); }
-#rcv-map .district { stroke: #fff; stroke-width: .6; stroke-linejoin: round; cursor: pointer; }
+#rcv-map .district { stroke: none; stroke-linejoin: round; cursor: pointer; }
+#rcv-map .district-coast, #rcv-map .district-borders, #rcv-map .mark { fill: none; stroke-linejoin: round; stroke-linecap: round; pointer-events: none; }
+#rcv-map .district-coast { stroke: #59626c; stroke-width: .6; }
+#rcv-map .district-borders { stroke: #fff; stroke-width: .6; }
 #rcv-map .district.off-ballot { cursor: default; }
-#rcv-map .district.hovered { stroke: #111418; stroke-width: 1.5; }
-#rcv-map .district.selected { stroke: #111418; stroke-width: 2.5; }
+#rcv-map .mark.hovered { stroke: #111418; stroke-width: 1.5; }
+#rcv-map .mark.selected { stroke: #111418; stroke-width: 2.5; }
 #rcv-map .district:focus-visible { outline: none; stroke: var(--link); stroke-width: 2.5; }
 #rcv-map .district-label { pointer-events: none; }
 #rcv-map .district-label text { font-size: 12px; font-weight: 600; fill: #111418; }

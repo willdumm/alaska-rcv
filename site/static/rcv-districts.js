@@ -1,6 +1,6 @@
 // The district views: the list of districts, the coverage table, and the map.
 import { $, addPlates, el, fmt, pct, strong, withTip } from "./rcv-dom.js";
-import { MIDDLE, MARGIN_BREAKS, ballotsLeft, ballotsLeftInContest, coverage, districtBallots, districtName, districts, isStatewide, lowCoverage, placesOf, roundTen } from "./rcv-model.js";
+import { MIDDLE, MARGIN_BREAKS, ballotsLeft, ballotsLeftInContest, coverage, districtBallots, districtName, districts, isStatewide, lowCoverage, placesOf, roundTen, districtLines } from "./rcv-model.js";
 import { senateSeatOf } from "./rcv-chambers.js";
 import { actions, currentContest as current, state } from "./rcv-state.js";
 
@@ -221,13 +221,18 @@ const overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b
 function drawPanel(parent, projection, width, height, { features = districts.features, seatOf = null } = {}) {
   const path = d3.geoPath(projection);
   const svg = d3.select(parent).append("svg").attr("viewBox", `0 0 ${width} ${height}`).attr("width", width).attr("height", height);
-  const shapes = svg.append("g").selectAll("path").data(features).join("path")
+  const layer = svg.append("g");
+  const shapes = layer.selectAll("path").data(features).join("path")
     .attr("class", "district").attr("d", path)
     .call(withTip, ({ properties: { hd } }) => [lastShares?.titleOf?.(hd) ?? districtName(hd), placesOf(hd), mapTipText(hd)], {
       over: (f) => highlightDistricts([f.properties.hd]),
       out: () => highlightDistricts([]),
       act: (f) => { if (currentContest()?.districts.includes(f.properties.hd)) selectDistrict(f.properties.hd); },
     });
+  const { borders, coast } = districtLines(features);
+  layer.append("path").attr("class", "district-coast").attr("d", path(coast));
+  layer.append("path").attr("class", "district-borders").attr("d", path(borders));
+  const marks = layer.append("g");
   const fits = (f) => {
     const [[x0, y0], [x1, y1]] = path.bounds(f);
     const [x, y] = projection(labelPoint(f.geometry));
@@ -251,7 +256,7 @@ function drawPanel(parent, projection, width, height, { features = districts.fea
     placed.push(box);
     return false;
   }).remove();
-  return { svg, shapes, labels: labelLayer.selectAll(".district-label"), labelLayer };
+  return { svg, path, shapes, marks, labels: labelLayer.selectAll(".district-label"), labelLayer };
 }
 
 // The inset's whole rectangle, as the state map's outline of what it shows.
@@ -328,14 +333,16 @@ export function drawMap() {
 }
 
 export function highlightDistricts(hds) {
-  for (const { shapes } of mapPanels) {
-    shapes.classed("hovered", (f) => hds.includes(f.properties.hd)).filter((f) => hds.includes(f.properties.hd)).raise();
-  }
-  if (!hds.length) raiseSelected();
+  drawMarks("hovered", hds);
 }
 
-function raiseSelected() {
-  for (const { shapes } of mapPanels) shapes.filter((f) => f.properties.hd === state.hd).raise();
+// A selected or hovered district's outline is its own shape over the map's lines. Moving the district itself up would take it
+// out from under the pointer, and then the browser wouldn't say when the pointer leaves it.
+function drawMarks(kind, hds) {
+  for (const { path, shapes, marks } of mapPanels) {
+    marks.selectAll(`path.${kind}`).data(shapes.data().filter((f) => hds.includes(f.properties.hd)))
+      .join("path").attr("class", `mark ${kind}`).attr("d", path);
+  }
 }
 
 let lastShares = null;
@@ -362,11 +369,10 @@ export function paintMap() {
       return onBallot(hd) ? districtColor(lastShares?.shares.get(hd), c) : OFF_BALLOT;
     })
       .classed("off-ballot", (f) => !onBallot(f.properties.hd))
-      .classed("selected", (f) => f.properties.hd === state.hd)
       .attr("aria-label", (f) => `${districtName(f.properties.hd)}: ${mapTipText(f.properties.hd)}`);
     labels.classed("off-ballot", (f) => !onBallot(f.properties.hd));
   }
-  raiseSelected();
+  drawMarks("selected", [state.hd]);
 }
 
 export function renderMapLegend(c, shares) {

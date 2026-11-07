@@ -123,6 +123,40 @@ export function districtBallots(hd) {
   return { summary: sum(Object.values(d?.summary ?? {})), cvr: sum(Object.values(d?.cvr ?? {})) };
 }
 
+// The map's lines, as line shapes. Neighbours' shapes use the very same points along a border, so an edge in two districts is
+// a border and an edge in one is coast.
+export function districtLines(features) {
+  const ringsOf = ({ geometry: { type, coordinates } }) => (type === "MultiPolygon" ? coordinates.flat() : coordinates);
+  const edgeOf = (a, b) => { const p = a.join(), q = b.join(); return p < q ? `${p}|${q}` : `${q}|${p}`; };
+  const ownerOf = new Map(), shared = new Set();
+  for (const feature of features) {
+    for (const ring of ringsOf(feature)) {
+      for (let i = 1; i < ring.length; i++) {
+        const edge = edgeOf(ring[i - 1], ring[i]);
+        if (!ownerOf.has(edge)) ownerOf.set(edge, feature);
+        else if (ownerOf.get(edge) !== feature) shared.add(edge);
+      }
+    }
+  }
+  // Each edge once, with edges of a kind in one unbroken line where they run on from each other.
+  const lines = { borders: [], coast: [] }, drawn = new Set();
+  for (const feature of features) {
+    for (const ring of ringsOf(feature)) {
+      let line = null, kindOfLine = null;
+      for (let i = 1; i < ring.length; i++) {
+        const edge = edgeOf(ring[i - 1], ring[i]);
+        if (drawn.has(edge)) { line = null; continue; }
+        drawn.add(edge);
+        const kind = shared.has(edge) ? "borders" : "coast";
+        if (line && kind === kindOfLine) line.push(ring[i]);
+        else { kindOfLine = kind; lines[kind].push(line = [ring[i - 1], ring[i]]); }
+      }
+    }
+  }
+  const shape = (coordinates) => ({ type: "MultiLineString", coordinates });
+  return { borders: shape(lines.borders), coast: shape(lines.coast) };
+}
+
 export const districtName = (hd) => (hd === 99 ? "Overseas absentee" : `District ${hd}`);
 // The name on the Division's form H07, like "Kodiak/Seward/Cordova". The overseas row has none.
 export const placesOf = (hd) => districtNames?.names[hd] ?? "";
