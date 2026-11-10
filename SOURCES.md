@@ -11,6 +11,7 @@ of this repo. Git holds only the prepared data. `sources.sha256` has the checksu
 | `snapshot-2026-11-05T231900Z` | The same CVR, summary and precinct CSV as `sources-2026-11-05`, with the received table updated November 5 at 2:19 PM Alaska time, `received.json` made from it, and all four files' response headers |
 | `snapshot-2026-11-07T203800Z` | The same CVR, summary and precinct CSV again, with the received table updated November 7 at 11:38 AM Alaska time, `received.json` made from it, and all four files' response headers |
 | `snapshot-2026-11-08T212700Z` | The same CVR, summary and precinct CSV again, with the received table updated November 8 at 12:27 PM Alaska time, `received.json` made from it, and all four files' response headers |
+| `snapshot-2026-11-10T004010Z` | The CVR posted 2026-11-10T00:40:10Z, with the summary (11/9/2026 2:55:21 PM, 401 of 401 precincts) and precinct CSV posted with it, the received table from November 8, `received.json` made from it, and all four files' response headers |
 
 Each later update gets a `snapshot-` release, named for its version: the Division's latest change, UTC, to the CVR, the summary or
 the received table. So a release can hold the same CVR as the one before it, with a newer table.
