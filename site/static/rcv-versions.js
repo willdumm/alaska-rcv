@@ -4,6 +4,12 @@ import { $, alaskaTime, el, fmt, strong } from "./rcv-dom.js";
 
 const ROOT = "/data/alaska-rcv-2026/";
 
+// Before November 10, 2026, a version was named for its time alone, such as 2026-11-07T203800Z, and links still use those names.
+// Two versions can share a time, and only the first of them had that name, so the oldest wins.
+export function oldName(versions, wanted) {
+  return versions.findLast((v) => v.time.replaceAll(":", "") === wanted);
+}
+
 // `wanted` comes from the URL, so it's only used if it's in the list. Without the list, the page still works, on the newest data.
 export async function chooseVersion(wanted) {
   let versions = [];
@@ -14,7 +20,7 @@ export async function chooseVersion(wanted) {
   } catch (error) {
     console.warn(`versions.json: ${error.message}`);
   }
-  const chosen = versions.find((v) => v.id === wanted);
+  const chosen = versions.find((v) => v.id === wanted) ?? oldName(versions, wanted);
   const earlier = chosen && chosen !== versions[0] ? chosen : null;
   return { versions, earlier, missing: Boolean(wanted && !chosen), dir: earlier ? `${ROOT}versions/${earlier.id}/` : ROOT };
 }

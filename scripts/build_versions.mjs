@@ -34,28 +34,42 @@ function parseReportStamp(text) {
   return fromAlaska(Number(match[3]), match[1] - 1, Number(match[2]), hour24(match[4], match[7]), Number(match[5]), Number(match[6]));
 }
 
-// A version is named for the Division's latest change to anything in it: the CVR, the summary or the received table.
+const stamp = (date) => date.toISOString().replace(/\.\d+Z$/, "Z");
+const compact = (date) => stamp(date).replaceAll(":", "");
+
+// When the page says a version is from: the Division's latest change to anything in it, the CVR, the summary or the received table.
 export function versionTime(coverage) {
   return new Date(Math.max(new Date(coverage.cvrLastModified), parseAsOf(coverage.received.asOf), parseReportStamp(coverage.report.stamp)));
 }
 
+// A version is named for when the CVR was posted and when the received table says it was updated, so "2026-11-10T004010Z-2026-11-09T232100Z".
+// Each only moves forward, so every update has a new name, and sorting the names puts them in the order they were posted. The latest
+// of them alone isn't enough: on November 9 a table stamped before the CVR was posted after it. The summary and precinct CSV come
+// with the CVR, so they aren't in the name. Versions kept before November 10 were named for versionTime, and old links use that.
 export function versionId(coverage) {
-  return versionTime(coverage).toISOString().replace(/\.\d+Z$/, "Z").replaceAll(":", "");
+  return `${compact(new Date(coverage.cvrLastModified))}-${compact(parseAsOf(coverage.received.asOf))}`;
 }
 
 export function manifestEntry(coverage) {
   return {
     id: versionId(coverage),
-    time: versionTime(coverage).toISOString().replace(/\.\d+Z$/, "Z"),
+    time: stamp(versionTime(coverage)),
     counted: coverage.report.votersCast,
     received: coverage.received.received,
     ...(coverage.received.questionedNote ? { note: coverage.received.questionedNote } : {}),
   };
 }
 
+// What the Division had posted, from a coverage.json. A version can be rebuilt with new code, but not replaced by other data.
+const sources = ({ cvrLastModified, report, received }) => JSON.stringify([cvrLastModified, report.stamp, report.votersCast, received.asOf, received.received]);
+
 function keep(built, data) {
-  const id = versionId(readJson(join(built, "coverage.json")));
+  const coverage = readJson(join(built, "coverage.json"));
+  const id = versionId(coverage);
   const target = join(data, "versions", id);
+  if (existsSync(join(target, "coverage.json")) && sources(readJson(join(target, "coverage.json"))) !== sources(coverage)) {
+    throw new Error(`version ${id} already holds other data from the Division: keep it, and find out what changed`);
+  }
   rmSync(target, { recursive: true, force: true });
   mkdirSync(target, { recursive: true });
   for (const name of readdirSync(built)) {

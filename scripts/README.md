@@ -28,7 +28,11 @@ turns scheduled runs off after 60 days with no activity in the repo.
 ## Earlier versions
 
 The page has one version per update from the Division: a complete data directory at `site/static/data/alaska-rcv-2026/versions/ID/`,
-where `ID` is the time of the Division's latest change to its CVR, summary or received table. `versions.json` lists them, and the
+where `ID` is when the CVR was posted and when the received table says it was updated, such as `2026-11-10T004010Z-2026-11-09T232100Z`.
+Each only moves forward, so the names sort in the order the updates were posted. The latest time alone can repeat: on November 9 the
+Division posted a table stamped before a CVR that was already up. The page dates each version by the latest of the CVR's, the
+summary's and the table's times. Before November 10 versions were named for that time, and the page still opens old links to them.
+`keep` replaces a version only with a rebuild of the same data, and stops if the Division's times or totals differ. `versions.json` lists them, and the
 page's default data is a copy of the newest. Every version runs today's model on that day's data, so it isn't what the page showed that
 day, and the page says so. Don't rebuild one from an old commit: old commits mix changes to the model with changes to the data.
 
