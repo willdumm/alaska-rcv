@@ -10,7 +10,7 @@ const stories = (c, result) => result.rounds.map((_, i) => roundStory(c, result,
 test("a round says who's eliminated and where the ballots went, and the last says how the count ended", () => {
   const result = tabulate([["A", 40], ["B", 35], ["CA", 10], ["CB", 5], ["C", 10]], ["A", "B", "C"]);
   assert.deepEqual(stories(contest(["A", "B", "C"]), result), [
-    "Name C has the fewest votes (25) and is eliminated: 10 to Name A, 5 to Name B, 10 stopped counting.",
+    "Name C has the fewest votes (25) and is eliminated. Ballots move to their next choice: Name A (10), Name B (5), and 10 stopped counting.",
     "Two candidates remain, so the count ends. Name A leads Name B by 10 votes, 55.6% to 44.4%.",
   ]);
 });

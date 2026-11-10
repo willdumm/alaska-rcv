@@ -13,10 +13,12 @@ export function roundStory(c, { rounds }, i) {
   const name = (l) => c.byLetter[l].short;
   if (round.eliminated) {
     const moved = round.transfers;
-    const parts = c.order.filter((l) => moved[l] >= 0.5).map((l) => `${fmt(moved[l])} to ${name(l)}`);
+    const parts = c.order.filter((l) => moved[l] >= 0.5).map((l) => `${name(l)} (${fmt(moved[l])})`);
     const stopped = (moved.exhausted || 0) + (moved.overvotes || 0);
-    if (stopped >= 0.5) parts.push(`${fmt(stopped)} stopped counting`);
-    return `${name(round.eliminated)} has the fewest votes (${fmt(round.votes[round.eliminated])}) and is eliminated: ${parts.join(", ") || "no ballots to move"}.`;
+    const lead = `${name(round.eliminated)} has the fewest votes (${fmt(round.votes[round.eliminated])}) and is eliminated.`;
+    if (!parts.length) return `${lead} ${stopped >= 0.5 ? `All ${fmt(stopped)} of those ballots stopped counting.` : "No ballots to move."}`;
+    if (stopped >= 0.5) parts.push(`and ${fmt(stopped)} stopped counting`);
+    return `${lead} Ballots move to their next choice: ${parts.join(parts.length > 2 ? ", " : " ")}.`;
   }
   const out = new Set(rounds.map((r) => r.eliminated));
   const standing = c.order.filter((l) => !out.has(l)).sort((p, q) => round.votes[q] - round.votes[p]);
