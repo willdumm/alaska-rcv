@@ -11,7 +11,7 @@ import { renderProjection } from "./rcv-projection.js";
 import { drawMap, paintMap, renderCoverage, renderDots, renderMapLegend, renderMapMode, setLastShares, windAllRings } from "./rcv-districts.js";
 import { actions, currentContest, state } from "./rcv-state.js";
 import { chamberContest, chamberLabel, isChamber, renderChamber } from "./rcv-seats.js";
-import { chooseVersion, renderVersions } from "./rcv-versions.js";
+import { chooseVersion, renderVersions, watchForNewer } from "./rcv-versions.js";
 
 let dataDir;
 let earlierVersion = null;
@@ -367,7 +367,30 @@ async function draw() {
   writeURL();
 }
 
+// The browser puts a reloaded page back where the reader was as soon as it loads, before the charts draw, so on a short page
+// it lands at the bottom, and stays with the bottom as the charts grow above it. So the page saves its place for this tab when
+// it's hidden, and goes back there itself once the charts have drawn. Storage can be blocked, and then a reload starts at the top.
+history.scrollRestoration = "manual";
+const SCROLL_KEY = "rcv-scroll";
+function saveScroll() {
+  try {
+    sessionStorage.setItem(SCROLL_KEY, JSON.stringify({ url: location.href, y: scrollY }));
+  } catch {}
+}
+function savedScroll() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(SCROLL_KEY));
+    sessionStorage.removeItem(SCROLL_KEY);
+    return saved?.url === location.href ? saved.y : 0;
+  } catch {
+    return 0;
+  }
+}
+
 async function main() {
+  const scrollBack = savedScroll();
+  addEventListener("pagehide", saveScroll);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) saveScroll(); });
   const version = await chooseVersion(new URLSearchParams(location.search).get("version"));
   dataDir = version.dir;
   earlierVersion = version.earlier;
@@ -393,6 +416,8 @@ async function main() {
   readURL();
   windAllRings();
   await render();
+  if (scrollBack) scrollTo(0, scrollBack);
+  watchForNewer(version);
 
   $("f-contest").addEventListener("change", (event) => {
     const { value } = event.target;
