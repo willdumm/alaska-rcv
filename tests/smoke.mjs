@@ -209,9 +209,11 @@ for (const chamber of ["senate", "house"]) {
   if (!lines.onChart) problems.push("a leader's ballots-left bar runs off the chart");
   await page.close();
 }
-// The summary's links go to their charts, below the sticky filters.
+// The summary's links go to their charts, below the sticky filters. The tabulation's link needs a race with later rounds, and
+// since November 14 the default race, U.S. Senate, has a first-round majority, so this uses U.S. Representative.
+const representative = index.contests.find((c) => c.name === "U.S. Representative").id;
 for (const [text, target] of [["see the ranked choice tabulation", "#rcv-flow"], ["see the simulation", "#projection"]]) {
-  const { page } = await opened(context, base);
+  const { page } = await opened(context, `${base}?contest=${representative}`);
   await page.getByRole("link", { name: text }).click();
   await page.waitForFunction(() => scrollY > 0);
   const gap = await page.evaluate((id) => document.querySelector(id).getBoundingClientRect().top - document.querySelector(".rcv-filters").getBoundingClientRect().bottom, target);
