@@ -5,7 +5,7 @@ import { tabulate } from "./rcv-tabulate.js";
 import { ballotCounts } from "./rcv-rows.js";
 import { measureContest, measuresIn } from "./rcv-measures.js";
 import { $, alaskaTime, el, fmt, pct, strong, watchPointers } from "./rcv-dom.js";
-import { INACTIVE_COLOR, LOW_RANKINGS, ballotsLeft, ballotsLeftInContest, countedBallots, coverage, districtName, districtShares, districts, index, knownRankings, majorityIn, ofRuns, parseStamp, placesOf, prepareContest, projection, readRanking, roundTen, setData, summaryEntry, summaryFor } from "./rcv-model.js";
+import { INACTIVE_COLOR, LOW_RANKINGS, ballotsLeft, ballotsLeftInContest, countedBallots, coverage, districtName, districtShares, districts, index, knownRankings, majorityIn, ofRuns, parseStamp, placesOf, prepareContest, projection, readRanking, roundTen, setData, summaryFor, writeInsMatter } from "./rcv-model.js";
 import { renderFlow, roundStory } from "./rcv-flow.js";
 import { renderProjection } from "./rcv-projection.js";
 import { drawMap, paintMap, renderCoverage, renderDots, renderMapLegend, renderMapMode, setLastShares, windAllRings } from "./rcv-districts.js";
@@ -46,16 +46,18 @@ function renderStatus() {
 }
 
 
-// The one line of numbers above the map: first choices, the rounds, the simulations, and what's left.
+// The one line of numbers above the map: round 1 (a ballot measure's votes), the rounds, the simulations, and what's left.
 function renderSummary(c, result) {
   const whole = state.hd === "all";
   const tile = (label, value, detail, link) => el("div", {}, el("dt", {}, label), el("dd", {}, value, el("small", {}, detail, ...(link ? [" ", el("a", { href: link.href }, link.text)] : []))));
   const tiles = [];
   const named = (l, votes, active) => `${c.byLetter[l].short} ${pct(votes[l], active)}`;
+  // Round 1 decides whether there are more rounds, so the line starts with it rather than the Division's first choices.
   const summary = summaryFor(c, state.hd);
-  if (summary?.total) {
-    const [top, next] = d3.sort(c.letters, (l) => -summary.votes[l]);
-    tiles.push(tile(c.measure ? "Votes" : "First choices", named(top, summary.votes, summary.total), `${next ? `${named(next, summary.votes, summary.total)}, ` : ""}from the Division's results`));
+  const { votes, active } = c.measure ? { votes: summary?.votes, active: summary?.total } : result.rounds[0];
+  if (active) {
+    const [top, next] = d3.sort(c.letters, (l) => -votes[l]);
+    tiles.push(tile(c.measure ? "Votes" : "Round 1", named(top, votes, active), `${next ? `${named(next, votes, active)}, ` : ""}${c.measure ? "from" : "counted from"} the Division's results`));
   }
   const last = result.rounds[result.rounds.length - 1];
   if (result.rounds.length > 1 && last.active) {
@@ -79,7 +81,7 @@ function renderCount(c, hd) {
   const keep = state.keepCounting && c.letters.length > 2;
   const result = keep ? tabulate(countedBallots(c, hd), c.letters, [], { ignoreMajority: true }) : stopped;
 
-  renderCountText(c);
+  renderCountText(c, result);
   renderCallout(c, result);
   renderKeepCounting(c, stopped, keep);
   renderFlow(c, result);
@@ -89,17 +91,26 @@ function renderCount(c, hd) {
   return result;
 }
 
-// Only a race with three or more candidates has rounds to project: otherwise this is the Division's summary as it stands.
-function renderCountText(c) {
+// Only a race with three or more candidates has rounds to project. With one or two, the count is round 1, which differs from
+// the Division's first choices by the ballots that rank a write-in or nothing first, so the text gives both.
+function renderCountText(c, result) {
   const ranked = c.letters.length > 2;
   const notHere = "The simulations in the next section account for ballots not yet counted, so their winning candidates may not match current tabulation results here.";
+  const roundOne = () => {
+    const { votes } = result.rounds[0];
+    const summary = summaryFor(c, state.hd);
+    const shown = d3.sort(c.letters, (l) => -votes[l]);
+    const writeIns = summary?.writeIn ? `, with ${fmt(summary.writeIn)} write-in${summary.writeIn === 1 ? "" : "s"}` : "";
+    return `Counted as AS 15.15.350(d) says, each ballot for its highest-ranked candidate: ${shown.map((l) => `${c.byLetter[l].short} ${fmt(votes[l])}`).join(", ")}.`
+      + (summary?.total ? ` The Division's first choices: ${shown.map((l) => fmt(summary.votes[l])).join(" and ")}${writeIns}.` : "");
+  };
   const intro = c.measure ? `The Division's results. ${notHere}`
-    : c.letters.length === 1 ? "The Division's first choices, without write-ins. This contest has one candidate, so there are no rounds to run."
-    : !ranked ? `The Division's first choices, without write-ins. With two candidates, no one is eliminated, so there's one round. ${notHere}`
-    : `Round 1 is the Division's first choices, without write-ins. Later rounds are an estimate from scanned ballots with the same first choice. ${notHere}`;
+    : c.letters.length === 1 ? `${roundOne()} This contest has one candidate, so there are no rounds to run.`
+    : !ranked ? `${roundOne()} With two candidates, no one is eliminated, so there's one round. ${notHere}`
+    : `Round 1 counts each ballot for its highest-ranked candidate, as AS 15.15.350(d) says, so a ballot that ranks a write-in or nothing first counts for the next candidate it ranks. Later rounds are an estimate from scanned ballots with the same first choice. ${notHere}`;
   $("rcv-count-intro").replaceChildren(el("p", {}, intro));
   $("count-title").textContent = ranked ? "Ranked choice tabulation, for ballots counted so far" : "The count so far";
-  document.querySelector("#count .rcv-tag").textContent = ranked ? "Projected from the Division's results" : "Division's results";
+  document.querySelector("#count .rcv-tag").textContent = ranked ? "Projected from the Division's results" : c.measure ? "Division's results" : "From the Division's results";
   $("rcv-projection-intro").replaceChildren(...(c.letters.length === 1 ? [] : [el("p", {}, "Here we simulate how the remaining ballots could look, based on the counts of ballots expected and the candidate shares of votes already counted in each district. The table below shows how many times each possible election outcome was observed in 1000 simulated elections. These should not be interpreted as candidates' probabilities of winning.")]));
 }
 
@@ -110,21 +121,17 @@ function renderCallout(c, result) {
   const warning = () => {
     const summary = summaryFor(c, state.hd);
     if (!result.rounds[0].active) return ["Nothing here yet. ", "No ballots match this selection."];
-    const writeIns = summaryEntry(c)?.writeIn ?? 0;
-    if (summary && whole && writeIns) {
-      const top = d3.max(Object.values(summary.votes)) ?? 0;
-      // Collectively first, or a close second to the leader.
-      if (writeIns >= top - (summary.total + writeIns) * 0.005) return ["Write-ins matter here. ", `Write-ins have ${fmt(writeIns)} first choices. Under state rules (6 AAC 25.071) their rankings may count in this contest. Scanned ballot data doesn't name write-ins, so these rounds can't be right if they do.`];
-    }
+    const writeIns = summary?.writeIn ?? 0;
+    if (whole && writeInsMatter(d3.max(Object.values(summary?.votes ?? {})) ?? 0, writeIns)) return ["Write-ins matter here. ", `Write-ins have ${fmt(writeIns)} first choices. Under state rules (6 AAC 25.071) their rankings may count in this contest. Scanned ballot data doesn't name write-ins, so these rounds can't be right if they do.`];
     const tie = result.rounds.find((r) => r.tieForLast);
     if (tie) return ["Tie for last. ", `${tie.tieForLast.map((l) => c.byLetter[l].short).join(" and ")} tie. The Division would decide this by lot. This page eliminates ${c.byLetter[tie.eliminated].short} as a placeholder.`];
     if (result.tiedFinal) return ["Tied. ", "Ranked choice tabulation ends in a tie on these ballots."];
     const known = knownRankings(c, state.hd);
     if (c.letters.length > 2 && known < LOW_RANKINGS) return ["Few known rankings. ", `Rankings are known for only ${pct(known, 1, 0)} of these ballots. The rest were counted by hand, so where their votes go next is close to a guess.`];
-    if (whole && (result.rounds.length > 1 || c.measure)) {
+    if (whole && (result.rounds.length > 1 || c.measure || c.letters.length === 2)) {
       const [a, b] = c.letters.map((l) => last.votes[l]).sort(d3.descending);
       const left = roundTen(ballotsLeftInContest(c).total);
-      if (a - b < left) return ["Not settled. ", `The gap${c.measure ? "" : " after ranked choice tabulation"} is about ${fmt(a - b)} ballots, with about ${fmt(left)} left.`];
+      if (a - b < left) return ["Not settled. ", `The gap${c.measure ? "" : c.letters.length === 2 ? " in the count" : " after ranked choice tabulation"} is about ${fmt(a - b)} ballots, with about ${fmt(left)} left.`];
     }
     return null;
   };
@@ -137,13 +144,14 @@ function renderKeepCounting(c, stopped, keep) {
   box.replaceChildren();
   if (!stopped.majorityInRoundOne || c.letters.length <= 2) return;
   const check = el("input", { type: "checkbox", checked: keep, onchange: (event) => { state.keepCounting = event.target.checked; render(); } });
-  box.append(`${c.byLetter[stopped.leader].short} has over half of the first choices, which ends Alaska's tabulation. `, el("label", {}, check, " Keep counting down to two anyway"));
+  box.append(`${c.byLetter[stopped.leader].short} has over half of round 1, which ends Alaska's tabulation. `, el("label", {}, check, " Keep counting down to two anyway"));
 }
 
 // `full` splits out why ballots aren't counting. The projected rounds only know that for the ballots in the CVR, so they don't.
 function renderRounds(table, c, result, full) {
   const { rounds } = result;
-  const won = majorityIn(rounds);
+  // With two candidates, round 1 is the last round, so a majority there decides nothing more than the lead does.
+  const won = c.letters.length > 2 ? majorityIn(rounds) : null;
   const cell = (votes, active, majority) => el("td", {}, votes === null ? "" : fmt(votes), votes === null || !active ? "" : el("span", { class: "pct" }, `${pct(votes, active)}${majority ? " · majority" : ""}`));
   const rows = c.order.map((l) => {
     const eliminatedAt = rounds.findIndex((r) => r.eliminated === l);
@@ -153,7 +161,7 @@ function renderRounds(table, c, result, full) {
   const line = (name, value, cls = "") => el("tr", { class: cls }, el("th", { scope: "row" }, name), ...rounds.map((r) => el("td", {}, fmt(value(r)))));
   const stoppedIn = (r) => r.exhausted + r.overvotes - rounds[0].overvotes;
   const inactive = full
-    ? [line("Blank", (r) => r.blanks), line("Two candidates at one rank", (r) => r.overvotes), ...(c.measure ? [] : [line("Ran out of rankings", (r) => r.exhausted)])]
+    ? [line("No candidate ranked", (r) => r.blanks), line("Two candidates at one rank", (r) => r.overvotes), ...(c.measure ? [] : [line("Ran out of rankings", (r) => r.exhausted)])]
     : [...(rounds.length > 1 ? [line("Needed for a majority", (r) => Math.floor(r.active / 2) + 1)] : []), ...(d3.max(rounds, stoppedIn) > 0 ? [line("Stopped counting", stoppedIn)] : [])];
   table.replaceChildren(
     el("thead", {}, el("tr", {}, el("th", { scope: "col" }, c.measure ? "Choice" : "Candidate"), ...rounds.map((_, i) => el("th", { scope: "col" }, c.measure ? "Votes" : `Round ${i + 1}`)))),
@@ -168,7 +176,8 @@ function renderTransfers(c, result) {
 
 // Drill-down
 
-// First choices come from the Division's summary, which has every counted ballot. Everything after comes from the CVR.
+// First choices come from the Division's summary, which has every counted ballot, with its write-ins for a whole contest.
+// Everything after comes from the CVR.
 function renderDrill(c, ballots) {
   const read = ballots.map(([pattern, count]) => ({ ...readRanking(pattern, c.letters), count }));
   const summary = summaryFor(c, state.hd);
@@ -192,11 +201,12 @@ function renderDrill(c, ballots) {
     const prefix = state.path.slice(0, depth);
     const here = read.filter((r) => prefix.every((p, i) => r.seq[i] === p));
     const fromSummary = depth === 0 && summary?.total;
-    const total = fromSummary ? summary.total : d3.sum(here, (r) => r.count);
+    const total = fromSummary ? summary.total + (summary.writeIn ?? 0) : d3.sum(here, (r) => r.count);
     if (!total) break;
     const counts = new Map();
     if (fromSummary) {
       for (const l of c.letters) counts.set(l, summary.votes[l]);
+      if (summary.writeIn) counts.set("writeIn", summary.writeIn);
     } else {
       for (const r of here) {
         const key = r.seq.length > depth ? r.seq[depth] : r.end;
@@ -210,6 +220,7 @@ function renderDrill(c, ballots) {
     const buttons = rows.map(([key, count]) => {
       const isCandidate = Boolean(c.color[key]);
       const name = isCandidate ? c.byLetter[key].short
+        : key === "writeIn" ? "Write-in"
         : key === "overvotes" ? "Overvote: stops here"
         : depth === 0 ? "No candidate ranked" : "No further ranking";
       const selected = isCandidate && state.path[depth] === key;

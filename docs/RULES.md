@@ -8,17 +8,23 @@ Division of Elections' count is the only official one, and this isn't affiliated
 They come from [AS 15.15.350](https://www.akleg.gov/basis/statutes.asp#15.15.350), 6 AAC 25.071, and the tabulation options
 printed on the Division's round-by-round reports:
 
-- If a candidate has more than half the continuing ballots in round 1, the count stops there. Otherwise the candidate with
-  the fewest votes is eliminated, one per round, until two remain. The Division's option is "Declare by threshold: False", so
+- If a candidate has more than half the continuing ballots in round 1, the count stops there. That's round 1 counted as
+  below, not first choices: the reports' option is "Votes to include in threshold calculation: Continuing ballots per round",
+  and `validate_2024.mjs` decides the same way. Otherwise the candidate with the fewest votes is eliminated, one per round,
+  until two remain. The Division's option is "Declare by threshold: False", so
   a majority in a later round doesn't stop the count. It does decide it: continuing ballots only shrink and that candidate's
   pile only grows, so no one can catch up. The page marks that round.
-- A ballot goes to its highest-ranked continuing candidate. Percentages are of continuing ballots.
 - A ballot stops counting at an overvote (two candidates at one rank), even if those candidates have been eliminated, or at
-  two or more skipped ranks in a row. A ballot with no rankings, or whose first two ranks are skipped, is a blank.
+  two or more skipped ranks in a row. A ballot that ranks no candidate, only write-ins or nothing, or whose first two ranks are skipped, is a blank.
 - A rank repeating a candidate already ranked counts as a skipped rank. See below.
-- Write-ins are passed over, and don't count as a skipped rank. Under 6 AAC 25.071 write-in rankings only count if the
-  write-ins together are first, or second within half a percent. The CVR has no write-in names, so the page can't resolve
-  them, and it warns in a contest where the rule could apply.
+- A ballot is "one vote for the highest-ranked continuing candidate" (AS 15.15.350(d)), in round 1 too. Percentages are of
+  continuing ballots. Write-ins are passed over, and don't count as a skipped rank, so a ballot that ranks a write-in or
+  nothing first counts for the next candidate it ranks. The Division's round-by-round reports count the same way, with no
+  write-in line.
+- Under 6 AAC 25.071 write-in rankings only count if the write-ins together are first, or a close second. The Division's 2026
+  media packet's test, on first choices, is (leader − write-ins) / (leader + write-ins) < 0.5%: `writeInsMatter` in
+  `rcv-model.js`. The CVR has no write-in names, so the page can't resolve them, and it warns in a contest where the rule
+  applies.
 - A tie for last is decided by lot under AS 15.15.350(e), which only the Division can do. The page flags a tie and
   eliminates the candidate listed later as a placeholder.
 
@@ -49,22 +55,54 @@ Later rounds in the rounds chart, the map's view after ranked choice tabulation 
 the Division has counted so far would run through the rules, because the CVR leaves out hand-counted ballots and the summary has
 no rankings. `site/static/rcv-projected.js` does this in the browser:
 
-- Round 1 is the summary's first choices, by candidate and district, without write-ins.
-- A CVR ballot whose first rank is that candidate stays as it is. The summary's remaining votes are spread over ballots with the
-  same first rank, in proportion: the district's Election Day ballots, or if those are under 30, all its ballots, or if those
-  are under 30, the same first rank elsewhere in the race. So hand-counted ballots are assumed to rank like scanned ones with
-  the same first choice. `simulate_projection.mjs` copies them the same way, as a sample.
-- A ballot past a blank or write-in first rank is left out, because the summary doesn't count it as a first choice for
-  anyone, though the Division's count would give it to its first ranked candidate. So round 1 equals the summary exactly, and
-  `tests/projected.test.mjs` checks that for every contest. It's 3,147 votes across 42 races on the CVR posted
-  2026-11-05T00:24:43Z.
+- Each candidate's first choices are the summary's, by district. A CVR ballot whose first rank is that candidate stays as it
+  is. The summary's remaining votes, mostly hand-counted ballots, are spread over ballots with the same first rank, in
+  proportion: the district's Election Day ballots, or if those are under 30, all its ballots, or if those are under 30, the
+  same first rank elsewhere in the race. So hand-counted ballots are assumed to rank like scanned ones with the same first
+  choice. `simulate_projection.mjs` copies them the same way, as a sample.
+- A CVR ballot whose first rank isn't a candidate stays as it is too, so one that ranks a write-in or nothing first counts for
+  the next candidate it ranks, as the rules above say. Round 1 is the summary's first choices plus those ballots: 5,352 votes
+  across 53 races on the CVR posted 2026-11-15T00:46:37Z. `tests/projected.test.mjs` checks that each candidate's first
+  choices equal the summary in every contest and district, and that round 1 equals the CVR's own round 1 wherever every ballot
+  was scanned.
 - Ballots not yet counted aren't included. The simulation adds those, so the two can name different leaders.
 
-So only a later round is an estimate. A race with one or two candidates, or a ballot measure, has no later round, and the page
-tags it as the summary. A majority in round 1 is the summary's too.
+So round 1 is exact but for the caveats below, and only a later round is an estimate. Whether a race goes to rounds is
+decided on this round 1, as the Division decides it. On the CVR posted 2026-11-15T00:46:37Z, Stutes has 6,782 of the 13,563
+first choices for candidates in Senate District C, 50.004%, but 6,806 of 13,633 in round 1, 49.92%: Harris is eliminated, and
+Stutes finishes with 7,219.
+
+The Division's summary counts each ballot only for its first rank, so its first choices are a little different. The page's
+first card is round 1, since that's what decides whether there are more rounds. The first level of the ballot rankings shows
+the Division's first choices, labelled as the Division's, with write-ins, as percentages of all votes. The map and the district table use round 1 too. The picker's "all seats" view uses first
+choices, as shares of votes for candidates. Where a share rounds to 50.0% without being half, the page gives it to two or three
+decimals, so it's clear which side of half it's on.
+
+A race with one or two candidates has no later round, so its count is round 1. The page tags it as from the Division's
+results, since it's computed from them rather than being them, and its text gives the Division's first choices and write-ins
+beside round 1. It shows no majority, since with two candidates round 1 decides the race anyway, and it gets the "Not settled"
+warning when the gap is under the ballots left. A ballot measure isn't ranked, so its count is the summary's yes and no, tagged
+as the Division's results.
 
 Nothing can check these rounds until the Division publishes its own on November 18, 2026: the checks below cover the
-tabulator on scanned ballots, which the page still shows in a collapsed table.
+tabulator on scanned ballots, which the page still shows in a collapsed table. That table counts as the rules above do, so its
+"No candidate ranked" line includes ballots that rank only write-ins, as in the Division's reports.
+
+### Caveats
+
+These are too small or too detailed for the page.
+
+- Hand-counted ballots that rank a write-in or nothing first are left out of round 1, since nothing shows what they rank
+  next: a few per race, up to about 10 on the CVR posted 2026-11-15T00:46:37Z.
+- Hand-counted ballots are mailed to Juneau and scanned into the CVR, and the Division's rounds are run on the CVR, so most
+  end up in the count. Not all: in 2024, Chevak's ballots (all 128) and 75 of Tuluksak's 78 weren't in House District 38's
+  rounds, though they were in its first choices, and in 2022 six villages' ballots, 259 voters, missed certification because
+  the mail didn't deliver them in time. The page counts every hand-counted ballot in round 1.
+- The Division doesn't report write-ins by district, so a district's first choices are shares of votes for candidates.
+- The scanned-ballots table can differ from first choices even where every ballot was scanned, because it counts as the law
+  does.
+- The Division doesn't say which count certifies a race without rounds, first choices or round 1. No race in 2024, or so far
+  in 2026, has had a different winner under the two.
 
 ## Seats not on the ballot
 

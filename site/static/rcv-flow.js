@@ -23,7 +23,7 @@ export function roundStory(c, { rounds }, i) {
   const out = new Set(rounds.map((r) => r.eliminated));
   const standing = c.order.filter((l) => !out.has(l)).sort((p, q) => round.votes[q] - round.votes[p]);
   const [a, b] = standing;
-  const opening = rounds.length > 1 ? "Two candidates remain, so the count ends. " : c.measure ? "" : standing.length > 2 ? `${name(a)} has over half of the first choices, so the count ends. ` : "With two candidates, no one is eliminated. ";
+  const opening = rounds.length > 1 ? "Two candidates remain, so the count ends. " : c.measure ? "" : standing.length > 2 ? `${name(a)} has over half of round 1, so the count ends. ` : "With two candidates, no one is eliminated. ";
   if (b === undefined) return `${opening}${name(a)} has all ${fmt(round.votes[a])} votes.`;
   if (Math.abs(round.votes[a] - round.votes[b]) < 0.5) return `${opening}${name(a)} and ${name(b)} are tied, at ${fmt(round.votes[a])} each.`;
   return `${opening}${name(a)} leads ${name(b)} by ${fmt(round.votes[a] - round.votes[b])} votes, ${pct(round.votes[a], round.active)} to ${pct(round.votes[b], round.active)}.`;

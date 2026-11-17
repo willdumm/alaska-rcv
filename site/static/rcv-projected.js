@@ -5,15 +5,14 @@
 // Election Day ballots, then its others, then the same first choice elsewhere in the race. It's the simulation's
 // hand-counted step as an expected value, with no resampling and no uncounted ballots. docs/RULES.md has the method.
 import { GROUP, eachRow } from "./rcv-rows.js";
-import { readBallot } from "./rcv-tabulate.js";
 
 export const MIN_BUCKET = 30;
 
 const total = (rows) => rows.reduce((sum, row) => sum + row.count, 0);
 
 // Returns Map(hd -> [[ranking, ballots], ...]), where ballots can be a fraction. summaryVotes(letter) gives { [hd]: votes }.
-// A ballot past a blank or write-in first rank reaches a candidate in the CVR's round 1 but isn't in the summary's first
-// choices, so it's left out, and round 1 equals the summary exactly. Ballots that never reach a candidate stay as they are.
+// A CVR ballot whose first rank isn't a candidate stays as it is, so one past a blank or write-in first rank counts for the
+// next candidate it ranks, as AS 15.15.350(d) says. Round 1 is then the summary's first choices plus those ballots.
 export function projectedBallots(c, summaryVotes) {
   const letters = c.candidates.map((x) => x.letter);
   const continuing = new Set(letters);
@@ -27,7 +26,7 @@ export function projectedBallots(c, summaryVotes) {
   for (const row of eachRow(c)) {
     const ranking = c.patterns[row.pattern];
     if (continuing.has(ranking[0])) rowsOf.get(ranking[0]).push({ ...row, ranking });
-    else if (!continuing.has(readBallot(ranking, continuing))) add(row.hd, ranking, row.count);
+    else add(row.hd, ranking, row.count);
   }
   for (const letter of letters) {
     const rows = rowsOf.get(letter);

@@ -16,7 +16,7 @@ As part of their preliminary election results, the Division of Elections posts r
 
 In ranked choice tabulation, if no candidate has a majority, the last-place candidate is eliminated and those ballots move to their next choice, until two candidates remain. Moving down the page:
 
-- **Results map by house district:** first choices in each district, and about how many ballots are left to count.
+- **Results map by house district:** round 1 in each district, and about how many ballots are left to count.
 - **Ranked choice tabulation:** who would win if counting stopped now, if hand-counted ballots rank candidates like scanned ballots do.
 - **Simulations:** a better idea of who wins once counting finishes. Each district's uncounted ballots are drawn at random from ballots already counted there, then tabulated. We run this simulation 1,000 times, and count how many simulations each candidate wins.
 - **Ballot rankings:** how scanned ballots ranked their next choices.
@@ -98,7 +98,7 @@ Ribbon thickness is ballots, and percentages are of the ballots still in the cou
 {{< rcv/details summary="Ranked choice tabulation on only scanned ballots" >}}
 
 {{< rcv/note >}}
-Scanned ballots only, with nothing estimated. Hand-counted ballots aren't here, so don't read this as who's ahead. This is the count that was checked: [see below](#caveats).
+Scanned ballots only, counted as the law counts them, with nothing estimated. Hand-counted ballots aren't here, so don't read this as who's ahead. This is the count that was checked: [see below](#caveats).
 {{< /rcv/note >}}
 
 {{< rcv/table id="rcv-cvr-rounds" >}}
@@ -156,6 +156,7 @@ Pick a first choice to see how scanned ballots ranked their next choice.
 
 - **No guarantee.** This is an independent page, not the Division's. The Division's count is the only official one, and it hasn't checked this page. Please don't contact the Division about it.
 - **Hand-counted ballots have first choices but no rankings.** They're concentrated in rural areas, so later rounds there rest on few ballots and may be wrong.
+- **Write-ins.** In the count, a ballot that ranks a write-in or nothing first counts for the next candidate it ranks, as the law says. The Division's first choices count it for no candidate, so the count's round 1 has a few more votes.
 - **Statewide races aren't decided by district.** Early and absentee ballots sit under the districts the Division's reports give them, which can differ from where voters live.
 - **Simulations aren't forecasts.** Different assumptions give different numbers.
 

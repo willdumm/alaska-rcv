@@ -1,14 +1,18 @@
-// The projected rounds: round 1 has to equal the Division's summary, and later rounds have to follow the CVR's rankings.
+// The projected rounds: round 1 has to count each ballot as AS 15.15.350(d) says, with the Division's first choices, and later
+// rounds have to follow the CVR's rankings.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { GROUP } from "../site/static/rcv-rows.js";
+import { GROUP, ballotCounts, sum } from "../site/static/rcv-rows.js";
 import { MIN_BUCKET, projectedBallots } from "../site/static/rcv-projected.js";
 import { tabulate } from "../site/static/rcv-tabulate.js";
+import { writeInsMatter } from "../site/static/rcv-model.js";
 import { everyContest } from "../scripts/lib.mjs";
 
 const data = new URL("../site/static/data/alaska-rcv-2026/", import.meta.url).pathname;
-const load = (name) => JSON.parse(readFileSync(data + name, "utf8"));
+const load = (name, dir = data) => JSON.parse(readFileSync(dir + name, "utf8"));
+// The CVR posted 2026-11-15T00:46:37Z, with that day's summary, for races whose numbers are checked by hand.
+const NOV_15 = `${data}versions/2026-11-15T004637Z-2026-11-15T200900Z/`;
 const { ELECTION_DAY: ED, EARLY } = GROUP;
 const candidates = [{ letter: "A", name: "A" }, { letter: "B", name: "B" }, { letter: "C", name: "C" }];
 
@@ -47,31 +51,78 @@ test("a first choice no CVR ballot has still counts, with no later rankings", ()
   assert.equal(got.C, 7);
 });
 
-test("a ballot past a blank or write-in first rank is left out, and one reaching no candidate stays", () => {
-  const c = contest([["AB", 1, ED, 5], ["-A", 1, ED, 3], ["WB", 1, ED, 2], ["--", 1, ED, 4], ["*", 1, ED, 1]]);
+test("a ballot past a blank or write-in first rank counts for the next candidate it ranks", () => {
+  const c = contest([["AB", 1, ED, 5], ["-A", 1, ED, 3], ["WB", 1, ED, 2], ["--", 1, ED, 4], ["W", 1, ED, 6], ["*", 1, ED, 1]]);
   const got = count(project(c, { A: { 1: 5 } }).get(1));
-  assert.deepEqual(got, { AB: 5, "--": 4, "*": 1 });
+  assert.deepEqual(got, { AB: 5, "-A": 3, WB: 2, "--": 4, W: 6, "*": 1 });
   const { rounds } = tabulate([...Object.entries(got)], ["A", "B", "C"]);
-  assert.equal(rounds[0].votes.A, 5);
-  assert.equal(rounds[0].blanks, 4);
+  assert.equal(rounds[0].votes.A, 8);
+  assert.equal(rounds[0].votes.B, 2);
+  assert.equal(rounds[0].blanks, 4 + 6);
   assert.equal(rounds[0].overvotes, 1);
 });
 
-test("round 1 equals the Division's summary in every contest, by district", () => {
-  const index = load("ballots.json"), coverage = load("coverage.json");
-  const all = everyContest(data, index);
-  assert.equal(all.length, 55);
-  for (const c of all) {
+// Every contest's projected ballots, by district, with the summary's first choices.
+function everyProjection(dir) {
+  const index = load("ballots.json", dir), coverage = load("coverage.json", dir);
+  return everyContest(dir, index).map((c) => {
     const summary = coverage.contests[c.summaryName ?? c.name];
     const nameOf = (l) => { const x = c.candidates.find((y) => y.letter === l); return x.summaryName ?? x.name; };
-    const letters = c.candidates.map((x) => x.letter);
-    const projected = projectedBallots(c, (l) => summary.byDistrict[nameOf(l)]);
+    const firstChoices = (l) => summary.byDistrict[nameOf(l)];
+    return { c, coverage, nameOf, firstChoices, letters: c.candidates.map((x) => x.letter), projected: projectedBallots(c, firstChoices) };
+  });
+}
+
+test("each candidate's first choices equal the Division's summary in every contest, by district", () => {
+  const all = everyProjection(data);
+  assert.equal(all.length, 55);
+  for (const { c, nameOf, firstChoices, letters, projected } of all) {
     for (const [hd, ballots] of projected) {
-      const { votes } = tabulate(ballots, letters).rounds[0];
       for (const l of letters) {
-        const want = summary.byDistrict[nameOf(l)][hd] || 0;
-        assert.ok(Math.abs(votes[l] - want) < 1e-6, `${c.name}, ${nameOf(l)}, HD ${hd}: ${votes[l]} against ${want}`);
+        const got = ballots.filter(([ranking]) => ranking[0] === l).reduce((sum, [, n]) => sum + n, 0);
+        const want = firstChoices(l)[hd] || 0;
+        assert.ok(Math.abs(got - want) < 1e-6, `${c.name}, ${nameOf(l)}, HD ${hd}: ${got} against ${want}`);
       }
     }
   }
+});
+
+test("round 1 equals the CVR's own round 1 in every fully scanned district", () => {
+  let checked = 0;
+  for (const { c, coverage, letters, projected } of everyProjection(data)) {
+    for (const [hd, ballots] of projected) {
+      const d = coverage.districts[hd];
+      if (!d || sum(Object.values(d.summary)) !== sum(Object.values(d.cvr))) continue;
+      const got = tabulate(ballots, letters).rounds[0], want = tabulate(ballotCounts(c, hd), letters).rounds[0];
+      for (const l of letters) assert.ok(Math.abs(got.votes[l] - want.votes[l]) < 1e-6, `${c.name}, HD ${hd}, ${l}`);
+      checked++;
+    }
+  }
+  assert.ok(checked > 0);
+});
+
+test("Senate District C goes to a second round, and House District 6 counts write-in ballots' next candidates", () => {
+  const race = (name) => {
+    const { letters, nameOf, projected } = everyProjection(NOV_15).find((x) => x.c.name === name);
+    const { rounds } = tabulate([...projected.values()].flat(), letters);
+    const votes = (r) => Object.fromEntries(letters.map((l) => [nameOf(l).split(",")[0], Math.round(r.votes[l])]));
+    return { rounds, votes };
+  };
+  const senate = race("Senate District C");
+  assert.equal(senate.rounds.length, 2);
+  assert.equal(senate.rounds[0].active, 13633);
+  assert.equal(senate.votes(senate.rounds[0]).Stutes, 6806);
+  assert.equal(senate.votes(senate.rounds[1]).Stutes, 7219);
+  const house = race("House District 6");
+  assert.deepEqual(house.votes(house.rounds[0]), { Vance: 4828, Johnson: 4822 });
+});
+
+test("write-ins matter when they're first, or within half a percent of the leader", () => {
+  assert.equal(writeInsMatter(100, 0), false);
+  assert.equal(writeInsMatter(100, 120), true);
+  assert.equal(writeInsMatter(100, 100), true);
+  // (1005 − 995) / 2000 is exactly 0.5%, which isn't under it.
+  assert.equal(writeInsMatter(1005, 995), false);
+  assert.equal(writeInsMatter(1004, 995), true);
+  assert.equal(writeInsMatter(140884, 872), false);
 });

@@ -3,7 +3,15 @@
 export const $ = (id) => document.getElementById(id);
 // Whole numbers: projected rounds have fractions of ballots.
 export const fmt = (n) => n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-export const pct = (n, of, digits = 1) => (of ? `${((n / of) * 100).toFixed(digits)}%` : "–");
+// Near half, one decimal can hide which side of it a share is on, so a share that rounds to 50.0% but isn't half gets more
+// decimals, up to three.
+export function pct(n, of, digits = 1) {
+  if (!of) return "–";
+  const share = (n / of) * 100;
+  let text = share.toFixed(digits);
+  while (digits > 0 && digits < 3 && share !== 50 && Number(text) === 50) text = share.toFixed(++digits);
+  return `${text}%`;
+}
 export const alaskaTime = (date) => date.toLocaleString("en-US", { timeZone: "America/Anchorage", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 
 export function el(tag, props = {}, ...children) {

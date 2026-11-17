@@ -220,6 +220,23 @@ for (const [text, target] of [["see the ranked choice tabulation", "#rcv-flow"],
   if (gap < 0) problems.push(`${text}: ${target} lands under the filters`);
   await page.close();
 }
+// A two-candidate race shows round 1 as its count and on its first card, with the Division's first choices and write-ins
+// beside it in the count's text, and no majority.
+{
+  const house = index.contests.find((c) => c.name === "House District 6").id;
+  const { page } = await opened(context, `${base}?contest=${house}`);
+  const seen = await page.evaluate(() => ({
+    intro: document.getElementById("rcv-count-intro").textContent,
+    tag: document.querySelector("#count .rcv-tag").textContent,
+    rounds: document.getElementById("rcv-rounds").textContent,
+    tile: document.getElementById("rcv-tiles").textContent,
+  }));
+  if (!/^Counted as AS 15\.15\.350\(d\) says.*The Division's first choices: .* write-in/.test(seen.intro)) problems.push(`House District 6's count says "${seen.intro}"`);
+  if (seen.tag !== "From the Division's results") problems.push(`House District 6's count is tagged "${seen.tag}"`);
+  if (seen.rounds.includes("majority")) problems.push("House District 6 shows a majority with two candidates");
+  if (!/^Round 1Vance 50\.\d\d%/.test(seen.tile)) problems.push(`House District 6's first card says "${seen.tile.slice(0, 40)}"`);
+  await page.close();
+}
 // The district picker uses the Division's names.
 {
   const { page } = await opened(context, base);

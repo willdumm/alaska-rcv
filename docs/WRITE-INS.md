@@ -1,6 +1,6 @@
 # Write-ins and round 1: plan
 
-A plan, not yet built. `RULES.md` has the rules as the page applies them now.
+A plan. Items 1–8 are built, and item 9 waits. `RULES.md` has the rules as the page applies them now.
 
 The page counts every race the way AS 15.15.350(d) says: each ballot is "one vote for the highest-ranked continuing
 candidate", and a candidate with "more than one-half of the active ballots" wins. Where the Division of Elections reports
@@ -74,11 +74,12 @@ One rule for every race: rounds as the law counts them, starting from round 1. F
    AS 15.15.350(d) says, each ballot for its highest-ranked candidate: Vance 4,828, Johnson 4,822. The Division's first
    choices: 4,826 and 4,813, with 11 write-ins." The tag says the count is from the Division's results, not that it is
    them. No "majority" label with two candidates. "Not settled" covers these races too.
-3. **The first-choices tile** shows the Division's numbers with write-ins: "Johnson 49.9%, write-ins 0.1%", percentages
-   of all votes. In one district of a multi-district race, it has no write-ins, as the Division reports none there.
+3. **The first tile** shows round 1, not first choices: "First choice percentages really don't matter for anything." (The
+   plan had first choices with write-ins here; changed after seeing the page.)
 4. **The flow chart's** round 1 story says "over half of round 1", not of first choices. **The drill-down's** first level is
    first choices, with a gray Write-in line (whole contest only) so it matches the tile.
-5. **Map, district table and the picker's all-seats view** stay on first choices, as shares of votes for candidates.
+5. **Map and district table** show round 1 too (changed after seeing the page). **The picker's all-seats view** stays on
+   first choices, as shares of votes for candidates. A share that rounds to 50.0% gets more decimals.
 6. **The write-in check.** One tested function with the Division's formula, used by the warning.
 7. **The collapsed scanned-ballots table.** Rename Blank to "No candidate ranked", which includes ballots that rank only
    write-ins, as in the Division's reports. Its note says it's scanned ballots only, counted as the law counts them.

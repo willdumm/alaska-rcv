@@ -90,8 +90,9 @@ export function readRanking(pattern, letters) {
   }
 }
 
-// The Division's first choices, for a whole contest or one district, without write-ins so they
-// compare with the count (which passes write-ins over). Null if there's nothing to compare.
+// The Division's first choices, for a whole contest or one district. `votes` and `total` are candidates' only, and
+// `writeIn` is the contest's write-ins, null for a district: the Division doesn't report them by district. Null if there's
+// nothing to compare.
 export const summaryEntry = (c) => coverage.contests[c.summaryName ?? c.name];
 
 export function summaryFor(c, hd) {
@@ -107,6 +108,10 @@ export function summaryFor(c, hd) {
   const leader = c.letters.reduce((a, b) => (votes[b] > votes[a] ? b : a));
   return { votes, total, leader, writeIn: hd === "all" ? summary.writeIn : null, timesCast: summary.timesCast };
 }
+
+// Whether write-ins' rankings could count under 6 AAC 25.071: write-ins together are first, or a close second. This is the
+// Division's 2026 media packet's test, (leader − write-ins) / (leader + write-ins) < 0.5%, with the leader's first choices.
+export const writeInsMatter = (leader, writeIns) => writeIns > 0 && (leader - writeIns) / (leader + writeIns) < 0.005;
 
 // Every ballot the summary has counted, with later rankings from the CVR (rcv-projected.js), for the whole contest or one
 // district. Falls back on the CVR's own ballots if the summary doesn't have this contest.
@@ -196,7 +201,8 @@ export function swarm(points, radius, maxReach = Infinity) {
   return placed;
 }
 
-// Who leads each district, and with what share. In "first" mode that's of every candidate's first choices in the summary. In
+// Who leads each district, and with what share. In "first" mode, the map's first view, that's of every candidate's votes in
+// round 1 (a ballot measure's yes and no in the summary). In
 // "final" mode it's of the two statewide finalists in the projected final round, as if only they were left. A ballot's final
 // reading doesn't depend on the order of eliminations, so this matches running the count to the end.
 export function districtShares(c, mode = "first") {
@@ -205,8 +211,8 @@ export function districtShares(c, mode = "first") {
   const removed = c.letters.filter((l) => l !== a && l !== b);
   const running = c.order.filter((l) => mode === "first" || l === a || l === b);
   const entry = (hd) => {
-    const votes = mode === "first" ? summaryFor(c, hd)?.votes ?? tabulate(ballotCounts(c, hd), c.letters).rounds[0].votes
-      : tabulate(countedBallots(c, hd), c.letters, removed).rounds[0].votes;
+    const votes = mode === "first" && c.measure ? summaryFor(c, hd)?.votes ?? tabulate(ballotCounts(c, hd), c.letters).rounds[0].votes
+      : tabulate(countedBallots(c, hd), c.letters, mode === "first" ? [] : removed).rounds[0].votes;
     const total = sum(running.map((l) => votes[l]));
     const [leader, next] = [...running].sort((p, q) => votes[q] - votes[p]);
     return { hd, votes, total, leader, next, share: total ? votes[leader] / total : null };

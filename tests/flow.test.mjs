@@ -3,6 +3,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { roundStory } from "../site/static/rcv-flow.js";
 import { tabulate } from "../site/static/rcv-tabulate.js";
+import { pct } from "../site/static/rcv-dom.js";
+
+test("a share near half gets the decimals that show which side of half it's on", () => {
+  assert.equal(pct(140884, 281540), "50.04%");
+  assert.equal(pct(4822, 9650), "49.97%");
+  assert.equal(pct(50004, 100000), "50.004%");
+  assert.equal(pct(1, 2), "50.0%");
+  assert.equal(pct(1, 3), "33.3%");
+  assert.equal(pct(1, 2, 0), "50%");
+});
 
 const contest = (letters, extra = {}) => ({ order: letters, byLetter: Object.fromEntries(letters.map((l) => [l, { short: `Name ${l}` }])), ...extra });
 const stories = (c, result) => result.rounds.map((_, i) => roundStory(c, result, i));
@@ -17,7 +27,7 @@ test("a round says who's eliminated and where the ballots went, and the last say
 
 test("a first-round majority ends the count with more than two candidates left", () => {
   const result = tabulate([["A", 60], ["B", 30], ["C", 10]], ["A", "B", "C"]);
-  assert.deepEqual(stories(contest(["A", "B", "C"]), result), ["Name A has over half of the first choices, so the count ends. Name A leads Name B by 30 votes, 60.0% to 30.0%."]);
+  assert.deepEqual(stories(contest(["A", "B", "C"]), result), ["Name A has over half of round 1, so the count ends. Name A leads Name B by 30 votes, 60.0% to 30.0%."]);
 });
 
 test("two candidates, a measure and a tie have their own words", () => {
