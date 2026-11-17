@@ -24,10 +24,13 @@ printed on the Division's round-by-round reports:
   round-by-round reports count the same way, with no write-in line: `validate_2024.mjs` matches round 1 of all 9 certified
   2024 reports exactly, and matches which of the 41 contests went to rounds.
 - Write-in rankings only count if the write-ins together are first, or a close second, in first choices. Otherwise they're
-  all defeated, before round 1. This is a regulation, 6 AAC 25.071, not a statute. Its text couldn't be read directly
-  (akleg.gov and Justia refused the request), so this follows the Division's descriptions of it, in its 2026 media packet
-  and its [ranked choice page](https://www.elections.alaska.gov/RCV.php/). The packet's test is
-  (leader − write-ins) / (leader + write-ins) < 0.5%: `writeInsMatter` in `rcv-model.js`. The CVR has no write-in names,
+  all defeated, before round 1. This is a regulation, [6 AAC 25.071](https://www.law.cornell.edu/regulations/alaska/6-AAC-25.071):
+  the board first counts the ballots with a write-in ranked highest, and if that's fewer than the leading candidate's
+  first-round votes by at least 0.5% of the two together, "all write-in candidates are defeated. Otherwise, the division
+  shall conduct the tabulation under AS 15.15.350 with each valid write-in candidate as an individual candidate." So
+  defeated write-ins aren't continuing candidates when AS 15.15.350(d) counts round 1, and a ballot ranking only write-ins
+  is inactive, out of the "active ballots" a majority is measured against. The test is
+  (leader − write-ins) / (leader + write-ins) < 0.5%, as the Division's 2026 media packet also puts it: `writeInsMatter` in `rcv-model.js`. The CVR has no write-in names,
   so the page can't resolve them, and it warns in a contest where the rule applies. Since write-ins go out first, the
   page's table keeps its Write-in or blank row last.
 - A tie for last is decided by lot under AS 15.15.350(e), which only the Division can do. The page flags a tie and
