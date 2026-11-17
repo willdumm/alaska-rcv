@@ -4,6 +4,7 @@ import test from "node:test";
 import { roundStory } from "../site/static/rcv-flow.js";
 import { tabulate } from "../site/static/rcv-tabulate.js";
 import { pct } from "../site/static/rcv-dom.js";
+import { firstChoices } from "../site/static/rcv-model.js";
 
 test("a share near half gets the decimals that show which side of half it's on", () => {
   assert.equal(pct(140884, 281540), "50.04%");
@@ -28,6 +29,19 @@ test("a round says who's eliminated and where the ballots went, and the last say
 test("a first-round majority ends the count with more than two candidates left", () => {
   const result = tabulate([["A", 60], ["B", 30], ["C", 10]], ["A", "B", "C"]);
   assert.deepEqual(stories(contest(["A", "B", "C"]), result), ["Name A has over half of round 1, so the count ends. Name A leads Name B by 30 votes, 60.0% to 30.0%."]);
+});
+
+test("first choices say where write-in and blank first choices went, before round 1", () => {
+  const c = contest(["A", "B"], { letters: ["A", "B"] });
+  const ballots = [["A", 40], ["B", 30], ["WA", 4], ["-B", 4], ["W", 2]];
+  const result = tabulate(ballots, ["A", "B"]);
+  const first = firstChoices(c, ballots);
+  assert.deepEqual([0, 1].map((i) => roundStory(c, result, i, first)), [
+    "Ballots with a write-in or blank first choice (10) are reassigned to the candidate they rank highest: Name A (4), Name B (4), and 2 rank no candidate.",
+    "With two candidates, no one is eliminated. Name A leads Name B by 10 votes, 56.4% to 43.6%.",
+  ]);
+  const none = [["A", 3], ["B", 1], ["W", 2]];
+  assert.equal(roundStory(c, tabulate(none, ["A", "B"]), 0, firstChoices(c, none)), "Ballots with a write-in or blank first choice (2) are reassigned to the candidate they rank highest, but none ranks a candidate.");
 });
 
 test("two candidates, a measure and a tie have their own words", () => {

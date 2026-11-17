@@ -2,8 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { countedBallots, districtLines, districtShares, placesOf, prepareContest, setData, summaryFor, swarm } from "../site/static/rcv-model.js";
-import { tabulate } from "../site/static/rcv-tabulate.js";
+import { districtLines, districtShares, placesOf, prepareContest, setData, summaryFor, swarm } from "../site/static/rcv-model.js";
 
 const data = (name) => JSON.parse(readFileSync(new URL(`../site/static/data/alaska-rcv-2026/${name}`, import.meta.url)));
 const index = data("ballots.json");
@@ -33,18 +32,19 @@ test("the map's borders are the edges two districts share, and its coast the res
   assert.equal(edges(coast), 25708);
 });
 
-test("round 1: the leader has the most votes, as a share of every candidate's", () => {
+test("first choices: the leader has the most votes, as a share of every candidate's and the write-in or blank ones", () => {
   for (const c of contests.filter((x) => x.letters.length > 1)) {
     const { shares, whole } = districtShares(c, "first");
     for (const d of [whole, ...shares.values()]) {
       if (!d.total) continue;
       const votes = c.letters.map((l) => d.votes[l]);
       assert.equal(d.votes[d.leader], Math.max(...votes));
-      assert.ok(Math.abs(d.total - votes.reduce((p, q) => p + q, 0)) < 1e-6);
+      assert.ok(Math.abs(d.total - votes.reduce((p, q) => p + q, 0) - (d.votes.W ?? 0)) < 1e-6);
       assert.equal(d.share, d.votes[d.leader] / d.total);
     }
-    const roundOne = tabulate(countedBallots(c), c.letters).rounds[0];
-    assert.ok(Math.abs(whole.votes[whole.leader] - Math.max(...c.letters.map((l) => roundOne.votes[l]))) < 1e-6, c.name);
+    // Candidates' first choices are the Division's, so the whole contest's leader is the summary's.
+    const summary = summaryFor(c, "all");
+    if (summary?.total) assert.ok(Math.abs(whole.votes[whole.leader] - summary.votes[summary.leader]) < 1e-6, c.name);
   }
 });
 

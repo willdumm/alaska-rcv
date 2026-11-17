@@ -88,7 +88,7 @@ In the view after ranked choice tabulation, hollow dots mark districts with unde
 {{< rcv/slot id="rcv-flow" class="rcv-chart" >}}
 
 {{< rcv/note id="rcv-flow-note" >}}
-Ribbon thickness is ballots, and percentages are of the ballots still in the count that round. Gray represents ballots with no further valid ranking.
+Ribbon thickness is ballots, and percentages are of the ballots still in the count that round. Gray represents ballots with no further valid ranking, and light tan represents write-in or blank first choices, which are reassigned before round 1.
 {{< /rcv/note >}}
 
 {{< rcv/table id="rcv-rounds" >}}
@@ -156,7 +156,6 @@ Pick a first choice to see how scanned ballots ranked their next choice.
 
 - **No guarantee.** This is an independent page, not the Division's. The Division's count is the only official one, and it hasn't checked this page. Please don't contact the Division about it.
 - **Hand-counted ballots have first choices but no rankings.** They're concentrated in rural areas, so later rounds there rest on few ballots and may be wrong.
-- **Write-ins.** Ballots with a write-in or blank first choice are reassigned to the candidate they rank highest, as the law says. The Division's first choices count them for no candidate.
 - **Statewide races aren't decided by district.** Early and absentee ballots sit under the districts the Division's reports give them, which can differ from where voters live.
 - **Simulations aren't forecasts.** Different assumptions give different numbers.
 

@@ -220,8 +220,8 @@ for (const [text, target] of [["see the ranked choice tabulation", "#rcv-flow"],
   if (gap < 0) problems.push(`${text}: ${target} lands under the filters`);
   await page.close();
 }
-// A two-candidate race shows round 1 as its count and on its first card, with the Division's first choices and write-ins
-// beside it in the count's text, and no majority.
+// A two-candidate race shows first choices, with write-in and blank first choices reassigned before round 1, and round 1's
+// majority in the table as in the chart. Its first card is first choices, and the next is the current result.
 {
   const house = index.contests.find((c) => c.name === "House District 6").id;
   const { page } = await opened(context, `${base}?contest=${house}`);
@@ -230,11 +230,16 @@ for (const [text, target] of [["see the ranked choice tabulation", "#rcv-flow"],
     tag: document.querySelector("#count .rcv-tag").textContent,
     rounds: document.getElementById("rcv-rounds").textContent,
     tile: document.getElementById("rcv-tiles").textContent,
+    result: [...document.querySelectorAll("#rcv-tiles > div")].find((d) => d.querySelector("dt").textContent === "Current result")?.textContent ?? "",
+    drill: [...document.querySelectorAll("#rcv-drill button")].map((b) => b.textContent),
   }));
-  if (!/^Counted as AS 15\.15\.350\(d\) says.*The Division's first choices: .* write-in/.test(seen.intro)) problems.push(`House District 6's count says "${seen.intro}"`);
+  if (!/^Ballots with a write-in or blank first choice are reassigned/.test(seen.intro)) problems.push(`House District 6's count says "${seen.intro}"`);
   if (seen.tag !== "From the Division's results") problems.push(`House District 6's count is tagged "${seen.tag}"`);
-  if (seen.rounds.includes("majority")) problems.push("House District 6 shows a majority with two candidates");
-  if (!/^Round 1Vance 50\.\d\d%/.test(seen.tile)) problems.push(`House District 6's first card says "${seen.tile.slice(0, 40)}"`);
+  if (!/^CandidateFirst choicesRound 1/.test(seen.rounds)) problems.push(`House District 6's table starts "${seen.rounds.slice(0, 40)}"`);
+  if (!seen.rounds.includes("majority")) problems.push("House District 6's table doesn't mark round 1's majority");
+  if (!/^First choicesVance 50(\.\d+)?%.*write-in or blank \d/.test(seen.tile)) problems.push(`House District 6's first card says "${seen.tile.slice(0, 80)}"`);
+  if (!/^Current result\S+ wins in round 1 with 5\d/.test(seen.result)) problems.push(`House District 6's current result says "${seen.result}"`);
+  if (!seen.drill.some((t) => t.startsWith("Write-in or blank"))) problems.push("House District 6's ballot rankings have no Write-in or blank button");
   await page.close();
 }
 // The district picker uses the Division's names.

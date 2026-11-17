@@ -2,8 +2,9 @@
 // the CVR. The summary has each candidate's first choices by district, including ballots counted by hand, and no rankings.
 // So for each candidate and district this keeps the CVR's ballots with that first rank as they are, and spreads the
 // summary's remaining votes over ballots like them, in the order scripts/simulate_projection.mjs copies them: the district's
-// Election Day ballots, then its others, then the same first choice elsewhere in the race. It's the simulation's
-// hand-counted step as an expected value, with no resampling and no uncounted ballots. docs/RULES.md has the method.
+// Election Day ballots, then its others, then the same first choice elsewhere in the race. It's meant as the simulation's
+// hand-counted step as an expected value, with no resampling and no uncounted ballots, though the simulation still picks
+// first choices by round 1 and adds no hand-counted write-ins. docs/RULES.md has the method.
 import { GROUP, eachRow } from "./rcv-rows.js";
 
 export const MIN_BUCKET = 30;

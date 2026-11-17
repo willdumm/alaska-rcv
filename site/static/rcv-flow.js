@@ -58,7 +58,7 @@ function storyLayout(rounds, width, x, wrapped, storyOf) {
   return { blocks, height: top };
 }
 
-// `first` adds the Division's first choices as a column before round 1, with write-ins set aside between them.
+// `first` adds first choices as a column before round 1, with write-in and blank first choices reassigned between them.
 export function renderFlow(c, result, first = null) {
   const box = $("rcv-flow");
   const { rounds } = result;
@@ -179,7 +179,9 @@ export function renderFlow(c, result, first = null) {
   flat(rows[rows.length - 1], x(rows.length - 1), width);
 
   const svg = d3.select(box).append("svg").attr("viewBox", `0 0 ${width} ${height}`).attr("role", "img").attr("class", phone ? "compact" : null)
-    .attr("aria-label", "Ballots flowing between candidates, one row per candidate, rounds from left to right. The table below has the same numbers.");
+    .attr("aria-label", first
+      ? "Ballots flowing between candidates, one row per candidate and one for write-in or blank first choices, from first choices to the last round, left to right. The table below has the same numbers."
+      : "Ballots flowing between candidates, one row per candidate, rounds from left to right. The table below has the same numbers.");
 
   // A moved ribbon fades from its old candidate's colour to its new one, so the bands join without a seam.
   const defs = svg.append("defs");

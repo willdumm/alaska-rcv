@@ -1,6 +1,7 @@
 # Write-ins and round 1: plan
 
-A plan. Items 1–8 are built, and item 9 waits. `RULES.md` has the rules as the page applies them now.
+A plan, now built but for item 9: items 1 and 6–8 as written, and items 2–5 as changed in "Shown before round 1"
+below. `RULES.md` has the rules as the page applies them now.
 
 The page counts every race the way AS 15.15.350(d) says: each ballot is "one vote for the highest-ranked continuing
 candidate", and a candidate with "more than one-half of the active ballots" wins. Where the Division of Elections reports
@@ -69,17 +70,13 @@ One rule for every race: rounds as the law counts them, starting from round 1. F
 1. **Round 1** (`rcv-projected.js:29-30`). Keep every CVR ballot whose first rank isn't a candidate as it is, instead of
    dropping the ones that reach a candidate. Hand-counted first choices are spread as now. Round 1 is then the summary's
    first choices plus the scanned ballots the law moves, exact wherever every ballot was scanned. The majority check then
-   uses this round 1, which fixes Senate District C.
-2. **Two-candidate races** show round 1 as their count, like any other race, and the count's text gives both: "Counted as
-   AS 15.15.350(d) says, each ballot for its highest-ranked candidate: Vance 4,828, Johnson 4,822. The Division's first
-   choices: 4,826 and 4,813, with 11 write-ins." The tag says the count is from the Division's results, not that it is
-   them. No "majority" label with two candidates. "Not settled" covers these races too.
-3. **The first tile** shows round 1, not first choices: "First choice percentages really don't matter for anything." (The
-   plan had first choices with write-ins here; changed after seeing the page.)
-4. **The flow chart's** round 1 story says "over half of round 1", not of first choices. **The drill-down's** first level is
-   first choices, with a gray Write-in line (whole contest only) so it matches the tile.
-5. **Map and district table** show round 1 too (changed after seeing the page). **The picker's all-seats view** stays on
-   first choices, as shares of votes for candidates. A share that rounds to 50.0% gets more decimals.
+   uses this round 1, which fixes Senate District C. Hand-counted write-ins, the summary's write-ins less the CVR's ballots
+   with a write-in first, are shared among districts by their hand-counted votes for candidates and spread like any other
+   first choice.
+2–5. **Superseded** by "Shown before round 1" below. As first planned: two-candidate races showed round 1 with the
+   Division's first choices in the text and no majority label; the first tile, the map and the district table showed round
+   1; the drill-down's first level was the Division's first choices with a gray Write-in line; and the all-seats view stayed
+   on shares of votes for candidates.
 6. **The write-in check.** One tested function with the Division's formula, used by the warning.
 7. **The collapsed scanned-ballots table.** Rename Blank to "No candidate ranked", which includes ballots that rank only
    write-ins, as in the Division's reports. Its note says it's scanned ballots only, counted as the law counts them.
@@ -87,21 +84,39 @@ One rule for every race: rounds as the law counts them, starting from round 1. F
    count, a ballot that ranks a write-in or nothing first counts for the next candidate it ranks, as the law says. The
    Division's first choices count it for no candidate, so the count's round 1 has a few more votes." Rewrite `RULES.md`'s
    write-in rules and its "Projected rounds" section (round 1, the two-candidate tag, the majority, the 3,147 figure) with
-   this, and add the caveats below.
-9. **The simulation, later.** `simulate_projection.mjs:90,102,112` takes hand-counted ballots as summary first choices less
-   the CVR's round 1, so moved ballots are subtracted from them (426 across 45 races on the 2026-11-05 CVR). Use the CVR's
-   first-rank marks instead. Its "Won on first choices" becomes "Won in round 1" (`rcv-projection.js:35`), and
-   `SIMULATION.md`'s "The floor on hand-counted ballots" section and its "first choices" labels change to match. This
-   waits until the page changes above have been seen, then goes in a separate commit with each version's
-   `projection.json` regenerated.
+   this, and add the caveats below. The page's write-ins bullet later moved to `RULES.md`, as too detailed for the page.
+9. **The simulation.** `simulate_projection.mjs:90,102,112` took hand-counted ballots as summary first choices less
+   the CVR's round 1, so moved ballots were subtracted from them (426 across 45 races on the 2026-11-05 CVR), and copied
+   their rankings from ballots with the same round 1 candidate. Use the CVR's first-rank marks instead, as `rcv-projected.js`
+   does, add hand-counted write-ins the same way, and record each race's Write-in or blank group by district for the
+   all-seats view. Its "Won on first choices" becomes "Won in round 1" (`rcv-projection.js:35`), and `SIMULATION.md`'s "The
+   floor on hand-counted ballots" section and its "first choices" labels change to match, in a separate commit with each
+   version's `projection.json` regenerated.
+
+### Shown before round 1
+
+After seeing items 2–5, the page changed to show write-in and blank first choices being reassigned:
+
+- Ballots that rank a write-in first, or leave the first rank blank and rank a candidate later, form one "Write-in or blank"
+  group (`firstChoices` in `rcv-model.js`). They're reassigned to the candidate they rank highest before round 1, and
+  those that rank no candidate stop counting. Round 1's majority check comes after.
+- "First choices" everywhere are candidates' first ranks and that group, as shares of all of them, not reassigned: the
+  first card, the first column of the chart and table, the map's first view, and the drill-down's first level, where the
+  group is clickable. The table keeps the group's row last, since write-ins go out before round 1 (6 AAC 25.071).
+- A "Current result" card: who wins in round 1 or after tabulation, from the count stopped where Alaska's would. With a
+  district selected, who leads.
+- Two-candidate races mark round 1's majority in the chart and the table.
+- The picker's all-seats view will add each race's group to its totals, from the simulation's output (item 9).
 
 ### Caveats for `RULES.md`
 
-- Hand-counted ballots that rank a write-in or nothing first are left out of round 1, since nothing shows what they rank
-  next: a few per race, up to about 10 on the 2026-11-15 CVR.
+- Hand-counted ballots that leave the first rank blank and rank a candidate later are left out, since the summary counts
+  them as undervotes. Hand-counted write-ins are in.
 - In 2024, Chevak's and Tuluksak's ballots weren't in House District 38's rounds, and in 2022 six villages' ballots missed
   certification.
-- The Division doesn't report write-ins by district, so a district's first choices are shares of votes for candidates.
+- The Division doesn't report write-ins by district, so a district's group is its CVR ballots plus its estimated share of
+  the contest's hand-counted write-ins.
+- A ballot with a write-in first and an overvote next is counted among those that rank no candidate.
 - The scanned-ballots table can differ from first choices even where every ballot was scanned, because it counts as the law
   does.
 
@@ -113,9 +128,12 @@ can change between versions: Senate District C had a majority on the summary in 
 
 ### Tests
 
-- `tests/projected.test.mjs`: round 1 equals `tabulate` on the CVR in fully scanned districts, and each candidate's first
-  choices equal the summary.
-- The write-in formula at its edges, a two-candidate race without a majority label, and Senate District C's two rounds.
+- `tests/projected.test.mjs`: round 1 equals `tabulate` on the CVR in fully scanned districts, each candidate's first
+  choices equal the summary, hand-counted write-ins are shared between districts by hand-counted votes, and `firstChoices`
+  reads each kind of first rank, keeping every ballot that's in round 1 or set aside.
+- `tests/districts.test.mjs`: districts' first choices, with the group, add up to the contest's.
+- `tests/flow.test.mjs`: the story of the reassignment.
+- The write-in formula at its edges, and Senate District C's two rounds.
 
 ## Not doing
 

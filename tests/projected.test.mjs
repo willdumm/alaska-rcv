@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { GROUP, ballotCounts, sum } from "../site/static/rcv-rows.js";
 import { MIN_BUCKET, projectedBallots } from "../site/static/rcv-projected.js";
 import { tabulate } from "../site/static/rcv-tabulate.js";
-import { writeInsMatter } from "../site/static/rcv-model.js";
+import { firstChoices, writeInsMatter } from "../site/static/rcv-model.js";
 import { everyContest } from "../scripts/lib.mjs";
 
 const data = new URL("../site/static/data/alaska-rcv-2026/", import.meta.url).pathname;
@@ -62,14 +62,40 @@ test("a ballot past a blank or write-in first rank counts for the next candidate
   assert.equal(rounds[0].overvotes, 1);
 });
 
-// Every contest's projected ballots, by district, with the summary's first choices.
+test("hand-counted write-ins are shared between districts by hand-counted votes, and copy write-in-first rankings", () => {
+  // District 1 has 10 hand-counted votes for A and district 2 has 30, so the 40 write-ins the CVR doesn't have split 1:3.
+  const c = contest([["A", 1, ED, 10], ["A", 2, ED, 10], ["WB", 1, ED, 40], ["-B", 1, ED, 40], ["WC", 2, ED, 40]]);
+  const projected = projectedBallots(c, (l) => ({ A: { 1: 20, 2: 40 } })[l] ?? {}, 120);
+  const [one, two] = [1, 2].map((hd) => count(projected.get(hd)));
+  assert.equal(one.WB, 40 + 10);
+  assert.equal(one["-B"], 40);
+  assert.equal(two.WC, 40 + 30);
+  // With no hand-counted votes, nothing shows where write-ins the CVR doesn't have were cast, so none are added.
+  const scanned = projectedBallots(c, (l) => ({ A: { 1: 10, 2: 10 } })[l] ?? {}, 120);
+  assert.equal(count(scanned.get(1)).WB, 40);
+  assert.equal(count(scanned.get(2)).WC, 40);
+});
+
+test("first choices put write-in and blank first ranks in one group, reassigned to the next candidate or stopped", () => {
+  const c = { letters: ["A", "B"] };
+  const first = firstChoices(c, [["A", 1], ["-A", 2], ["WA", 4], ["W", 8], ["W*", 16], ["-W", 32], ["--A", 64], ["*A", 128]]);
+  assert.deepEqual(first.votes, { A: 1, B: 0, W: 2 + 4 + 8 + 16 });
+  // A write-in followed by an overvote stops at the overvote, and is counted with those that rank no candidate.
+  assert.deepEqual(first.transfers, { A: 2 + 4, B: 0, exhausted: 8 + 16, overvotes: 0 });
+  assert.equal(first.active, 1 + 30);
+  assert.equal(first.eliminated, "W");
+  assert.equal(firstChoices(c, [["A", 1], ["BA", 1], ["--A", 1], ["*", 1]]), null);
+  assert.equal(firstChoices({ letters: ["Y", "N"], measure: true }, [["-Y", 1]]), null);
+});
+
+// Every contest's projected ballots, by district, with the summary's first choices and write-ins, as the page has them.
 function everyProjection(dir) {
   const index = load("ballots.json", dir), coverage = load("coverage.json", dir);
   return everyContest(dir, index).map((c) => {
     const summary = coverage.contests[c.summaryName ?? c.name];
     const nameOf = (l) => { const x = c.candidates.find((y) => y.letter === l); return x.summaryName ?? x.name; };
     const firstChoices = (l) => summary.byDistrict[nameOf(l)];
-    return { c, coverage, nameOf, firstChoices, letters: c.candidates.map((x) => x.letter), projected: projectedBallots(c, firstChoices) };
+    return { c, coverage, nameOf, firstChoices, letters: c.candidates.map((x) => x.letter), projected: projectedBallots(c, firstChoices, summary.writeIn ?? 0) };
   });
 }
 
@@ -99,6 +125,20 @@ test("round 1 equals the CVR's own round 1 in every fully scanned district", () 
     }
   }
   assert.ok(checked > 0);
+});
+
+test("first choices hold every ballot in round 1, and the write-in or blank ones that stop", () => {
+  let checked = 0;
+  for (const { c, letters, projected } of everyProjection(data)) {
+    const ballots = [...projected.values()].flat();
+    const first = firstChoices({ ...c, letters }, ballots);
+    if (!first) continue;
+    const round1 = tabulate(ballots, letters).rounds[0];
+    assert.ok(Math.abs(first.active - round1.active - first.transfers.exhausted) < 1e-6, c.name);
+    for (const l of letters) assert.ok(Math.abs(first.votes[l] + first.transfers[l] - round1.votes[l]) < 1e-6, `${c.name}, ${l}`);
+    checked++;
+  }
+  assert.ok(checked > 40);
 });
 
 test("Senate District C goes to a second round, and House District 6 counts write-in ballots' next candidates", () => {
