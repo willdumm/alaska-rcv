@@ -31,8 +31,8 @@ export function renderProjection(c) {
   const inRound = (l, round) => winner(l).byRound[round] ?? [];
   const order = d3.sort(c.order, (l) => -winner(l).wins);
   const roundColumns = roundsShown.length > 1 ? roundsShown : [];
-  // A win in round 1 is a first-choice majority, which ends the count. Every other win runs the tabulation down to two.
-  const decided = (round) => (round === 1 ? "on first choices" : "after tabulation");
+  // A win in round 1 is a round 1 majority, which ends the count. Every other win runs the tabulation down to two.
+  const decided = (round) => (round === 1 ? "in round 1" : "after tabulation");
   table.replaceChildren(
     el("thead", {}, el("tr", {}, ...[c.measure ? "Result" : "Candidate", "Share of simulations", ...roundColumns.map((r) => `Won ${decided(r)}`), "Median winning share"].map((h) => el("th", { scope: "col" }, h)))),
     el("tbody", {}, ...order.map((l) => {
@@ -51,7 +51,7 @@ export function renderProjection(c) {
   const high = Math.max(sim.highShare, 0.51);
   const x = d3.scaleLinear([0.5, high], [margin.left + radius, width - margin.right - radius]);
   const svg = d3.select(box).append("svg").attr("role", "img")
-    .attr("aria-label", `One dot per simulation, for each candidate, along that candidate's share of the votes when they won${roundColumns.length ? ", on separate lines for wins on first choices and wins after ranked choice tabulation" : ""}. The table above summarizes the same simulations.`);
+    .attr("aria-label", `One dot per simulation, for each candidate, along that candidate's share of the votes when they won${roundColumns.length ? ", on separate lines for wins in round 1 and wins after ranked choice tabulation" : ""}. The table above summarizes the same simulations.`);
   const grid = svg.append("g");
   let y = 0, leftOut = false;
   for (const l of order.filter((l) => winner(l).wins)) {
@@ -71,7 +71,7 @@ export function renderProjection(c) {
       const label = line.append("text").attr("class", "dim");
       const count = `${fmt(wins)} ${wins === 1 ? "win" : "wins"}`;
       if (roundsShown.length > 1) {
-        label.append("tspan").attr("x", 0).attr("y", -3).text(round === 1 ? "First choices" : "Tabulation");
+        label.append("tspan").attr("x", 0).attr("y", -3).text(round === 1 ? "Round 1" : "Tabulation");
         label.append("tspan").attr("x", 0).attr("y", 12).text(count);
       } else {
         label.append("tspan").attr("x", 0).attr("y", 4).text(count);

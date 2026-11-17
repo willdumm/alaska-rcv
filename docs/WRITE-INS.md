@@ -1,7 +1,6 @@
 # Write-ins and round 1: plan
 
-A plan, now built but for item 9: items 1 and 6–8 as written, and items 2–5 as changed in "Shown before round 1"
-below. `RULES.md` has the rules as the page applies them now.
+A plan, now built: items 1 and 6–9 as written, and items 2–5 as changed in "Shown before round 1" below. `RULES.md` has the rules as the page applies them now.
 
 The page counts every race the way AS 15.15.350(d) says: each ballot is "one vote for the highest-ranked continuing
 candidate", and a candidate with "more than one-half of the active ballots" wins. Where the Division of Elections reports
@@ -87,11 +86,12 @@ One rule for every race: rounds as the law counts them, starting from round 1. F
    this, and add the caveats below. The page's write-ins bullet later moved to `RULES.md`, as too detailed for the page.
 9. **The simulation.** `simulate_projection.mjs:90,102,112` took hand-counted ballots as summary first choices less
    the CVR's round 1, so moved ballots were subtracted from them (426 across 45 races on the 2026-11-05 CVR), and copied
-   their rankings from ballots with the same round 1 candidate. Use the CVR's first-rank marks instead, as `rcv-projected.js`
-   does, add hand-counted write-ins the same way, and record each race's Write-in or blank group by district for the
-   all-seats view. Its "Won on first choices" becomes "Won in round 1" (`rcv-projection.js:35`), and `SIMULATION.md`'s "The
-   floor on hand-counted ballots" section and its "first choices" labels change to match, in a separate commit with each
-   version's `projection.json` regenerated.
+   their rankings from ballots with the same round 1 candidate. It now uses the CVR's first-rank marks, as `rcv-projected.js`
+   does, adds hand-counted write-ins the same way in whole ballots, leans uncounted ballots by first-rank mark so the
+   Write-in or blank group keeps its share, and records each race's group by district for the all-seats view. Its "Won on
+   first choices" became "Won in round 1" (`rcv-projection.js:35`), and `SIMULATION.md`'s "The floor on hand-counted
+   ballots" section, now "Hand-counted ballots by first rank", and its labels changed to match, in a separate commit with
+   each version's `projection.json` regenerated.
 
 ### Shown before round 1
 
@@ -106,7 +106,7 @@ After seeing items 2–5, the page changed to show write-in and blank first choi
 - A "Current result" card: who wins in round 1 or after tabulation, from the count stopped where Alaska's would. With a
   district selected, who leads.
 - Two-candidate races mark round 1's majority in the chart and the table.
-- The picker's all-seats view will add each race's group to its totals, from the simulation's output (item 9).
+- The picker's all-seats view adds each race's group to its totals, from the simulation's output (item 9).
 
 ### Caveats for `RULES.md`
 
@@ -133,6 +133,8 @@ can change between versions: Senate District C had a majority on the summary in 
   reads each kind of first rank, keeping every ballot that's in round 1 or set aside.
 - `tests/districts.test.mjs`: districts' first choices, with the group, add up to the contest's.
 - `tests/flow.test.mjs`: the story of the reassignment.
+- `tests/simulation.test.mjs`: with `--hand-only`, the hand-counted step adds each candidate's first-rank marks and the
+  summary's write-ins, and each chamber race has its group by district.
 - The write-in formula at its edges, and Senate District C's two rounds.
 
 ## Not doing

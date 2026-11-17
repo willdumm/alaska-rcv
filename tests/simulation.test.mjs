@@ -160,3 +160,19 @@ test("the committed file's counts add up for every contest", () => {
     assert.equal(chamber.outcomes.reduce((sum, row) => sum + row[4], 0), runs, chamber.name);
   }
 });
+
+// The earliest version has hand-counted write-ins in 12 races: --hand-only stops with an error unless every candidate's first
+// ranks and the write-ins match what the simulation meant to add, and the write-ins match the summary.
+const EARLIEST = `${data}versions/2026-11-04T114246Z-2026-11-03T212600Z/`;
+
+test("hand-counted ballots add each candidate's first ranks and the summary's write-ins", () => {
+  const projection = simulateProjection(EARLIEST, { ...settings, runs: 1, handOnly: true });
+  assert.ok(Object.values(projection.contests).some((sim) => sim.ballots.hand > 0));
+});
+
+test("each chamber race records its write-in or blank first choices by district, as its own page counts them", () => {
+  const projection = JSON.parse(readFileSync(`${data}projection.json`));
+  const races = Object.values(projection.chambers).flatMap((chamber) => chamber.races);
+  assert.ok(races.every((race) => race.writeInOrBlank && Object.keys(race.writeInOrBlank).every((hd) => race.hds.includes(Number(hd)))));
+  assert.ok(races.some((race) => Object.keys(race.writeInOrBlank).length > 0));
+});

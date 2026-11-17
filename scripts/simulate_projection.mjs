@@ -2,16 +2,18 @@
 // rankings, then runs the page's tabulator. scripts/README.md has how to rerun it, SIMULATION.md has the whole method, and the page's
 // "Simulated projection" section has the assumptions in words. Same inputs give a byte-identical file.
 // Usage: node simulate_projection.mjs DATA_DIR OUT.json --runs 1000 --seed S --tau T --tau-local T --tau-party T --min-pool N --min-bucket N
-// With --hand-only it adds only the hand-counted ballots, and stops with an error unless each race's first round has
-// exactly the votes the simulation meant to add. OUT.json is then only useful for checking. This checks the simulation's
-// arithmetic, not the data: check_counts.mjs is what compares the CVR with the Division's summary.
+// With --hand-only it adds only the hand-counted ballots, and stops with an error unless each race's first-rank marks are
+// exactly what the simulation meant to add, write-ins included. OUT.json is then only useful for checking. This checks the
+// simulation's arithmetic, not the data: check_counts.mjs is what compares the CVR with the Division's summary.
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { readBallot, tabulate } from "../site/static/rcv-tabulate.js";
+import { tabulate } from "../site/static/rcv-tabulate.js";
 import { questionedAheadOfCvr, questionedByDistrict, turnoutSince2024, uncountedByDistrict } from "../site/static/rcv-uncounted.js";
 import { GROUP, eachRow } from "../site/static/rcv-rows.js";
 import { outcomeRows, partyGroup, seatsPerRun, senateDistricts } from "../site/static/rcv-chambers.js";
+import { projectedBallots } from "../site/static/rcv-projected.js";
+import { firstChoices } from "../site/static/rcv-model.js";
 import { add, binomial, everyContest, gaussian, generator, readJson } from "./lib.mjs";
 
 // Every value is recorded in the output and decides the result, so a bad or missing one has to stop the run.
@@ -87,8 +89,10 @@ function prepareRace(c, { index, coverage, uncounted, questioned }) {
   const statewide = Boolean(c.measure || index.statewide.includes(c.id));
   const letters = c.candidates.map((x) => x.letter);
   const everyone = new Set(letters);
-  const first = c.patterns.map((p) => readBallot(p, everyone));
-  const firstChoiceIs = (l) => ([p]) => first[p] === l;
+  // Each ballot's first rank as marked, as the summary counts it: a candidate, "W" for a write-in, or null for a blank or
+  // overvote. rcv-projected.js picks hand-counted ballots' rankings by the same mark. Tabulating still reads the whole ballot.
+  const mark = c.patterns.map((p) => (everyone.has(p[0]) || p[0] === "W" ? p[0] : null));
+  const firstChoiceIs = (l) => ([p]) => mark[p] === l;
 
   const whole = new Map(), electionDay = new Map(), earlyAbsentee = new Map(), cvrFirst = new Map(), cvrQuestioned = new Map();
   for (const { pattern, hd, group, count: n } of eachRow(c)) {
@@ -100,7 +104,7 @@ function prepareRace(c, { index, coverage, uncounted, questioned }) {
     }
     if (group === GROUP.QUESTIONED) add(cvrQuestioned, hd, n);
     if (!cvrFirst.has(hd)) cvrFirst.set(hd, new Map());
-    add(cvrFirst.get(hd), first[pattern], n);
+    if (mark[pattern]) add(cvrFirst.get(hd), mark[pattern], n);
   }
 
   const summary = coverage.contests[c.summaryName ?? c.name].byDistrict;
@@ -110,13 +114,28 @@ function prepareRace(c, { index, coverage, uncounted, questioned }) {
   const allDistricts = Object.keys(coverage.districts).map(Number).sort((a, b) => a - b);
   const hds = allDistricts.filter((hd) => electionDay.has(hd) || earlyAbsentee.has(hd) || letters.some((l) => summaryVotes(l, hd)));
   const hand = new Map(hds.map((hd) => [hd, new Map(letters.map((l) => [l, Math.max(0, summaryVotes(l, hd) - (cvrFirst.get(hd)?.get(l) || 0))]))]));
+  const cvrFirstTotals = new Map();
+  for (const counts of cvrFirst.values()) for (const [l, n] of counts) add(cvrFirstTotals, l, n);
+  // The summary has write-ins by contest only, so those the CVR doesn't have are shared among districts by their
+  // hand-counted votes for candidates, as rcv-projected.js does, in whole ballots: each district gets its share rounded down,
+  // and the ballots left over go to the largest remainders.
+  const summaryWriteIns = coverage.contests[c.summaryName ?? c.name].writeIn ?? 0;
+  const handWriteIns = Math.max(0, summaryWriteIns - (cvrFirstTotals.get("W") || 0));
+  const handVotes = hds.map((hd) => totalOf(hand.get(hd)));
+  const allHandVotes = sumOf(handVotes, (n) => n);
+  if (handWriteIns && allHandVotes) {
+    const exact = handVotes.map((n) => (handWriteIns * n) / allHandVotes);
+    const shares = exact.map(Math.floor);
+    const left = handWriteIns - sumOf(shares, (n) => n);
+    const byRemainder = exact.map((_, i) => i).sort((i, j) => exact[j] - shares[j] - (exact[i] - shares[i]) || i - j);
+    for (const i of byRemainder.slice(0, left)) shares[i]++;
+    hds.forEach((hd, i) => { if (shares[i]) hand.get(hd).set("W", shares[i]); });
+  }
   const questionedExpected = questionedByDistrict(coverage, questioned, statewide);
   const questionedHere = new Map(hds.map((hd) => [hd, Math.max(0, questionedExpected.get(hd) - (cvrQuestioned.get(hd) || 0) - questionedAheadOfCvr(coverage, questioned, statewide, hd))]));
   const uncountedHere = new Map(hds.map((hd) => [hd, uncounted.get(hd) || 0]));
 
-  const cvrFirstTotals = new Map();
-  for (const counts of cvrFirst.values()) for (const [l, n] of counts) add(cvrFirstTotals, l, n);
-  const statewideByFirst = new Map(letters.map((l) => [l, new Map([...whole].filter(firstChoiceIs(l)))]));
+  const statewideByFirst = new Map([...letters, "W"].map((l) => [l, new Map([...whole].filter(firstChoiceIs(l)))]));
 
   const totals = { cvr: totalOf(whole), hand: 0, uncounted: 0, questioned: 0, notOnBallot: 0 };
   for (const hd of hds) {
@@ -130,24 +149,25 @@ function prepareRace(c, { index, coverage, uncounted, questioned }) {
     for (const hd of allDistricts) if (!hds.includes(hd)) totals.notOnBallot += Math.round(uncounted.get(hd) || 0);
   }
 
-  return { c, statewide, letters, everyone, first, firstChoiceIs, whole, electionDay, earlyAbsentee, hds, multiDistrict: hds.length > 1, hand, questionedHere, uncountedHere, cvrFirstTotals, statewideByFirst, totals };
+  return { c, statewide, letters, everyone, mark, firstChoiceIs, summaryWriteIns, whole, electionDay, earlyAbsentee, hds, multiDistrict: hds.length > 1, hand, questionedHere, uncountedHere, cvrFirstTotals, statewideByFirst, totals };
 }
 
-// Multiplies each candidate's first-choice bucket by exp(z), rescaled so blanks and overvotes keep their share.
+// Multiplies each candidate's first-choice bucket by exp(z), rescaled so ballots with a write-in, blank or overvote first
+// keep their share. Buckets go by first rank as marked, so a ballot reassigned from a write-in or blank doesn't lean.
 function leaned(counts, lean, race, noBucket, random) {
-  const { everyone, first, letters } = race;
+  const { everyone, mark, letters } = race;
   const entries = [...counts];
   let plain = 0, weighted = 0;
   const seen = new Set();
   for (const [p, n] of entries) {
-    if (!everyone.has(first[p])) continue;
-    seen.add(first[p]);
+    if (!everyone.has(mark[p])) continue;
+    seen.add(mark[p]);
     plain += n;
-    weighted += n * lean[first[p]];
+    weighted += n * lean[mark[p]];
   }
   for (const l of letters) if (!seen.has(l)) noBucket[l]++;
   const scale = weighted ? plain / weighted : 1;
-  return new Pool(entries.map(([p, n]) => [p, everyone.has(first[p]) ? n * lean[first[p]] * scale : n]), random);
+  return new Pool(entries.map(([p, n]) => [p, everyone.has(mark[p]) ? n * lean[mark[p]] * scale : n]), random);
 }
 
 // Later rankings for a hand-counted first choice, from the same first choice on the district's Election Day
@@ -158,6 +178,8 @@ function handBucket(l, day, mail, race, minBucket, random) {
   const bucket = totalOf(fromDay) >= minBucket ? fromDay : merged(fromDay, new Map([...mail].filter(firstChoiceIs(l))));
   const short = minBucket - totalOf(bucket);
   if (short <= 0 || (!multiDistrict && bucket.size)) return { bucket, filled: false };
+  // A write-in with no candidate ranked after it counts for no one, so with nothing to copy, nothing changes the count.
+  if (l === "W" && !statewideByFirst.get(l).size) return { bucket, filled: false };
   if (!statewideByFirst.get(l).size) throw new Error(`${c.name}: hand-counted votes for ${l}, who has no CVR ballots to copy rankings from`);
   return { bucket: merged(bucket, resample(statewideByFirst.get(l), random, short)), filled: true };
 }
@@ -178,10 +200,10 @@ function fillDistrict(hd, ballots, lean, race, { settings, turnout, random, topp
 
   // Hand-counted ballots' first choices are known, so they aren't leaned: only later rankings are drawn.
   const handBallots = new Map();
-  for (const l of letters) {
-    const need = hand.get(hd).get(l);
+  for (const [l, need] of hand.get(hd)) {
     if (!need) continue;
     const { bucket, filled } = handBucket(l, day, mail, race, settings.minBucket, random);
+    if (l === "W" && !bucket.size) continue;
     if (filled) toppedUp.hand += need;
     new Pool([...bucket], random).drawInto(handBallots, need);
   }
@@ -202,11 +224,17 @@ function fillDistrict(hd, ballots, lean, race, { settings, turnout, random, topp
   fillFrom("questioned", drawCount(questionedHere.get(hd)), merged(day, handBallots));
 }
 
-function checkHandCounted(result, race) {
-  const { c, letters, hds, hand, cvrFirstTotals } = race;
-  for (const l of letters) {
-    const expected = (cvrFirstTotals.get(l) || 0) + sumOf(hds, (hd) => hand.get(hd).get(l));
-    if (result.rounds[0].votes[l] !== expected) throw new Error(`${c.name}: ${l} has ${result.rounds[0].votes[l]} first-round votes, expected ${expected}`);
+// With only hand-counted ballots added, each candidate's first ranks must be the summary's wherever it has more than the CVR,
+// and write-ins the summary's too, if any were added.
+function checkHandCounted(ballots, race) {
+  const { c, letters, mark, hds, hand, cvrFirstTotals, summaryWriteIns } = race;
+  const marked = new Map();
+  for (const [p, n] of ballots) if (mark[p]) add(marked, mark[p], n);
+  for (const l of [...letters, "W"]) {
+    const added = sumOf(hds, (hd) => hand.get(hd).get(l) || 0);
+    const expected = (cvrFirstTotals.get(l) || 0) + added;
+    if ((marked.get(l) || 0) !== expected) throw new Error(`${c.name}: ${l} is ranked first on ${marked.get(l) || 0} ballots, expected ${expected}`);
+    if (l === "W" && added && expected !== summaryWriteIns) throw new Error(`${c.name}: ${expected} write-ins first, but the summary has ${summaryWriteIns}`);
   }
 }
 
@@ -259,7 +287,7 @@ function simulateContest(c, world, settings) {
     for (const hd of hds) fillDistrict(hd, ballots, lean, race, { settings, turnout, random, toppedUp, noBucket });
 
     const result = tabulate([...ballots].map(([p, n]) => [c.patterns[p], n]), letters);
-    if (handOnly) checkHandCounted(result, race);
+    if (handOnly) checkHandCounted(ballots, race);
     const last = result.rounds[result.rounds.length - 1];
     results.push({
       winner: result.leader,
@@ -272,9 +300,20 @@ function simulateContest(c, world, settings) {
   return { name: c.name, tau, ballots: totals, toppedUpPerRun: perRun(toppedUp), noLeanTargetPerRun: perRun(noBucket), runs: results };
 }
 
+// Each district's write-in or blank first choices in a race, as the race's own page counts them (firstChoices on
+// countedBallots), so the all-seats view, which loads no ballots, can include them in its totals.
+function writeInOrBlank(c, coverage) {
+  const summary = coverage.contests[c.summaryName ?? c.name];
+  const letters = c.candidates.map((x) => x.letter);
+  const byLetter = new Map(c.candidates.map((x) => [x.letter, x.summaryName ?? x.name]));
+  const projected = projectedBallots(c, (l) => summary.byDistrict[byLetter.get(l)], summary.writeIn ?? 0);
+  const counts = [...projected].map(([hd, ballots]) => [hd, Number((firstChoices({ letters }, ballots)?.votes.W ?? 0).toFixed(2))]);
+  return Object.fromEntries(counts.filter(([, n]) => n > 0));
+}
+
 // The seats each chamber has: its races this election, and those not on the ballot from holdovers.json.
-function buildChambers(contests, holdovers) {
-  const race = (c, seat, hds) => ({ id: c.id, name: c.name, seat, hds, candidates: c.candidates.map((x) => ({ letter: x.letter, name: x.name, party: x.parties?.[0] ?? "" })) });
+function buildChambers(contests, holdovers, coverage) {
+  const race = (c, seat, hds) => ({ id: c.id, name: c.name, seat, hds, candidates: c.candidates.map((x) => ({ letter: x.letter, name: x.name, party: x.parties?.[0] ?? "" })), writeInOrBlank: writeInOrBlank(c, coverage) });
   const chamberOf = (name, seats, races, notOnBallot) => {
     const hds = [...races, ...notOnBallot].flatMap((x) => x.hds).sort((a, b) => a - b);
     if (races.length + notOnBallot.length !== seats || hds.some((hd, i) => hd !== i + 1) || hds.length !== 40) throw new Error(`${name}: races and seats not on the ballot don't cover ${seats} seats and every house district`);
@@ -309,7 +348,7 @@ export function simulateProjection(dataDir, settings) {
   for (const c of all) {
     if (c.candidates.length >= 2) simulated[c.id] = simulateContest(c, world, settings);
   }
-  const chambers = buildChambers(all, load("holdovers.json"));
+  const chambers = buildChambers(all, load("holdovers.json"), coverage);
   // Seat counts need every race's result from the same simulation, so they're worked out here, while all the results exist.
   for (const chamber of Object.values(chambers)) chamber.outcomes = outcomeRows(seatsPerRun(chamber, { parameters: { runs }, contests: simulated }));
   const contests = Object.fromEntries(all.filter((c) => simulated[c.id]).map((c) => {

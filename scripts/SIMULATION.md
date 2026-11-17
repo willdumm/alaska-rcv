@@ -11,7 +11,7 @@ ballots still to be counted with copies of real ballots, runs the real tabulator
 - Simulate each race 1,000 times, locally, and store what the page needs as a static file. The page shows counts out of 1,000.
 - Every simulated ballot is a real ranking from the CVR, and every simulation goes through the real tabulator.
 - Every number on the page regenerates from a committed, seeded script.
-- Show how many simulations each candidate wins, plus one dot per simulation, on separate lines for wins on first choices and wins after tabulation.
+- Show how many simulations each candidate wins, plus one dot per simulation, on separate lines for wins in round 1 and wins after tabulation.
 - Report a share of simulations, never a chance of winning.
 
 ## Files
@@ -49,11 +49,15 @@ It takes about 70 seconds on a laptop and needs `ballots.json`, `contest-*.json`
 | `--tau-party` | 0.2 | The part of a State House or Senate Republican's or Democrat's lean shared with their party in that simulation. See "Whole chambers" |
 | `--min-pool` | 300 | Smallest pool to draw uncounted or questioned ballots from |
 | `--min-bucket` | 30 | Fewest ballots to copy a hand-counted first choice's later rankings from |
-| `--hand-only` | off | Adds only hand-counted ballots and stops with an error unless each first round has exactly the votes the simulation meant to add. This checks its arithmetic, not the data: `check_counts.mjs` compares the CVR with the summary. Use a throwaway output |
+| `--hand-only` | off | Adds only hand-counted ballots and stops with an error unless each candidate's first-rank marks, and the write-ins, are exactly what the simulation meant to add. This checks its arithmetic, not the data: `check_counts.mjs` compares the CVR with the summary. Use a throwaway output |
 
-## The floor on hand-counted ballots
+## Hand-counted ballots by first rank
 
-The summary counts each ballot's first rank as marked, but the count's round 1 also has ballots that reach a candidate past a blank or write-in first rank. So round 1 can exceed the summary in a district, by 3,147 votes across 42 races on the CVR posted 2026-11-05T00:24:43Z, and the hand-counted count floors those at 0. `check_counts.mjs` confirms the cause: first-rank marks alone never exceed the summary, and equal it exactly in fully scanned districts. Taking the hand-counted count from first-rank marks instead would add 426 ballots across the 45 ranked races. That isn't done, so the published simulation doesn't change.
+The summary counts each ballot's first rank as marked, while the count's round 1 also has ballots that reach a candidate past a blank or write-in first rank. So the simulation goes by each CVR ballot's first rank as marked, its `mark`: a candidate, `W` for a write-in, or nothing for a blank or overvote, as `rcv-projected.js` does. Hand-counted ballots for a candidate are the summary's votes less the CVR's ballots marked for them, and copy rankings from ballots with the same mark, so a hand-counted ballot never copies a `-A` or `WA` ranking. `check_counts.mjs` confirms first-rank marks never exceed the summary, and equal it exactly in fully scanned districts, so the floor at 0 never applies.
+
+Until the CVR posted 2026-11-17T02:41:03Z, the simulation went by round 1 instead, which counted ballots past a blank or write-in first rank for their next candidate. Round 1 then exceeded the summary by 3,147 votes across 42 races on the CVR posted 2026-11-05T00:24:43Z, floored at 0, and the hand-counted ballots were 426 short across the 45 ranked races. Every version's `projection.json` was regenerated with the change.
+
+**Hand-counted write-ins** are the summary's write-ins less the CVR's ballots marked `W`. The summary has them by contest only, so they're shared among districts by each district's hand-counted votes for candidates, as the page shares them. The simulation needs whole ballots, so each district gets its share rounded down, and what's left goes one each to the largest remainders. They copy rankings from ballots marked `W`, with the same buckets as any hand-counted first choice. A write-in that ranks no candidate counts for no one, so with no `W` ballots to copy, none are added. On the CVR posted 2026-11-17T02:41:03Z there are none to add; on the earliest, 2026-11-04T11:42:46Z, 215 across 12 races.
 
 ## Which races
 
@@ -76,7 +80,7 @@ The CVR's own ballots are added as they are, then the whole set goes through `ta
 | Ballots | How many | Copied from |
 |---|---|---|
 | CVR | All | Not copied, and not resampled |
-| Hand-counted | Per candidate and district: summary minus CVR first choices, floored at 0 | That district's resampled Election Day ballots with the same first choice. Under `--min-bucket`, its early and absentee ones too, then the same first choice elsewhere in the race |
+| Hand-counted | Per candidate and district: summary minus CVR first-rank marks. Write-ins: the summary's less the CVR's, shared among districts | That district's resampled Election Day ballots with the same first-rank mark. Under `--min-bucket`, its early and absentee ones too, then the same mark elsewhere in the race |
 | Uncounted early and absentee | The estimate below, redrawn each simulation | The district's resampled early and absentee ballots, filled up to `--min-pool` |
 | Questioned | The estimate below, redrawn each simulation | The district's resampled Election Day and hand-counted ballots, filled up to `--min-pool` |
 
@@ -114,8 +118,10 @@ The lean says uncounted ballots might not vote like the ballots they're copied f
 
 - Each simulation draws `z ~ Normal(0, tau)` per candidate. It's the same in every district of the race. In State House and
   Senate races a Republican's or Democrat's `z` is partly shared: see "Whole chambers".
-- In each uncounted or questioned pool, each candidate's first-choice ballots are weighted by `exp(z)`, then rescaled so
-  blanks and overvotes keep their share.
+- In each uncounted or questioned pool, the ballots with each candidate's first-rank mark are weighted by `exp(z)`, then
+  rescaled so ballots with a write-in, blank or overvote first keep their share. This is a choice: going by round 1 instead
+  would lean the write-in or blank ballots with the candidate they're reassigned to. By mark, the write-in or blank group
+  keeps its share of each pool, and only first choices that voters marked for a candidate lean.
 - Hand-counted ballots don't lean, because their first choices are known.
 - A pool with no ballots for a candidate can't lean to them. `noLeanTargetPerRun` counts those.
 
@@ -164,7 +170,7 @@ rankings as a weak prior, which breaks the "only real ballots" rule, so it wasn'
 
 ## Where copied rankings come from
 
-A hand-counted ballot has a first choice and no rankings, so it copies them from CVR ballots with the same first choice. The
+A hand-counted ballot has a first choice and no rankings, so it copies them from CVR ballots with the same first-rank mark. The
 question only arises in races spanning several districts: a single-district race has no ballots elsewhere. Both the page and
 the simulation use the district's ballots when it has at least `--min-bucket` (30) of them. Below that, the page uses every
 ballot in the race with that first choice, and the simulation keeps the district's and fills the shortfall from them. Those
@@ -259,7 +265,8 @@ A run takes 9 seconds at 100 simulations and 71 at 1,000. One ballot at a time t
   cvrLastModified,            // compared with coverage.json by the page
   chambers: { house, senate: {
     name, seats,
-    races: [ { id, name, seat, hds, candidates: [ { letter, name, party } ] } ],
+    races: [ { id, name, seat, hds, candidates: [ { letter, name, party } ],
+               writeInOrBlank: { [hd]: n } } ],                 // write-in or blank first choices, for the all-seats view
     notOnBallot: [ { seat, hds, name, party, until } ],           // holdovers.json
     outcomes: [ [republican, democrat, other, tied, simulations] ],  // each seat split reached, most common first
   } },
@@ -287,8 +294,8 @@ result from the same simulation, so `outcomes` is worked out first, and the page
 ## On the page
 
 - **Order.** After the map and the tabulation, in a tinted box tagged "Simulated", so the page reads as first choices, then transfers, then the ballots still to come. The rounds cover only ballots counted so far, so they can name a different leader, and the page says so. The line of numbers at the top gives the selected contest's largest win count.
-- **Table.** One row per candidate, sorted by wins: simulations won of 1,000, wins on first choices and after tabulation, median winning share.
-- **Plot.** One dot per simulation, at the winner's share of continuing ballots at the end of tabulation, on a line for first choices or tabulation.
+- **Table.** One row per candidate, sorted by wins: simulations won of 1,000, wins in round 1 and after tabulation, median winning share.
+- **Plot.** One dot per simulation, at the winner's share of continuing ballots at the end of tabulation, on a line for round 1 or tabulation.
   The axis runs from 50% to the largest share in that race. Dots only shift up or down to avoid overlapping. Tooltips give the share and how it was won.
 - **Candidates with no wins** are merged into one "0 of 1,000 wins" line under the plot. A candidate who won even once has a dot and a count.
 - **Tight races.** A line's dots stack at most 96 pixels either side of it, so a tight race can't make the plot huge. Dots that don't fit are
@@ -300,7 +307,7 @@ result from the same simulation, so `outcomes` is worked out first, and the page
 Run these after changing the simulation or its inputs:
 
 1. Run it twice and `cmp` the files: they must be byte-identical.
-2. Run with `--hand-only`, which stops with an error if the simulation's first rounds don't add up, and run `check_counts.mjs`, which compares the CVR with the summary.
+2. Run with `--hand-only`, which stops with an error unless each candidate's first-rank marks, and write-ins, are what the simulation meant to add, and run `check_counts.mjs`, which compares the CVR with the summary.
 3. Render every contest at phone and desktop widths, looking for page errors and anything past the screen edge.
 4. `refresh.sh check` compares `CVR_Export.zip`'s `Last-Modified` with `cvrLastModified` in `coverage.json`, before deploying.
 

@@ -14,7 +14,8 @@ const MAX_OUTCOMES = 5;
 export const isChamber = (id) => id === "house" || id === "senate";
 export const chamberLabel = (id) => `All ${projection.chambers[id].seats} seats`;
 
-// What a page needs from one race: first choices, with their leader, and who wins the most simulations.
+// What a page needs from one race: first choices, with their leader, and who wins the most simulations. Totals include the
+// race's write-in or blank first choices, from projection.json, as on the race's own page.
 function raceSummary(race) {
   const byDistrict = coverage.contests[race.name].byDistrict;
   const lastNames = race.candidates.map((x) => x.name.split(",")[0]);
@@ -25,7 +26,7 @@ function raceSummary(race) {
     votes: Object.values(byDistrict[x.name] ?? {}).reduce((a, b) => a + b, 0),
     wins: projection.contests[race.id] ? projection.contests[race.id].winners[x.letter]?.wins ?? 0 : null,
   }));
-  const total = candidates.reduce((sum, x) => sum + x.votes, 0);
+  const total = candidates.reduce((sum, x) => sum + x.votes, 0) + d3.sum(Object.values(race.writeInOrBlank ?? {}));
   const [leader, next] = d3.sort(candidates, (x) => -x.votes);
   const lead = total ? ((leader.votes - (next?.votes ?? 0)) / total) * 100 : null;
   return { ...race, seat: race.seat.replace(/^HD /, "District "), candidates, total, leader, next, lead, simWinner: candidates.length > 1 ? d3.greatest(candidates, (x) => x.wins) : leader };
@@ -46,7 +47,7 @@ const withParty = (x) => `${x.short} (${PARTY_GROUPS.find((g) => g.key === x.gro
 function firstChoicesIn(race, hd) {
   const byDistrict = coverage.contests[race.name].byDistrict;
   const votes = race.candidates.map((x) => ({ ...x, votes: byDistrict[x.name]?.[hd] ?? 0 }));
-  const total = d3.sum(votes, (x) => x.votes);
+  const total = d3.sum(votes, (x) => x.votes) + (race.writeInOrBlank?.[hd] ?? 0);
   const [leader, next] = d3.sort(votes, (x) => -x.votes);
   return { total, leader, next, lead: total ? ((leader.votes - (next?.votes ?? 0)) / total) * 100 : null };
 }

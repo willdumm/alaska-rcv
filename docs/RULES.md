@@ -64,7 +64,7 @@ no rankings. `site/static/rcv-projected.js` does this in the browser:
   is. The summary's remaining votes, mostly hand-counted ballots, are spread over ballots with the same first rank, in
   proportion: the district's Election Day ballots, or if those are under 30, all its ballots, or if those are under 30, the
   same first rank elsewhere in the race. So hand-counted ballots are assumed to rank like scanned ones with the same first
-  choice. `simulate_projection.mjs` copies them the same way, as a sample.
+  choice. `simulate_projection.mjs` copies them the same way, as a sample, by each ballot's first rank as marked.
 - A CVR ballot whose first rank isn't a candidate stays as it is too, so one that ranks a write-in or nothing first is
   reassigned to the next candidate it ranks, as the rules above say. Round 1 is the summary's first choices plus those
   ballots: 5,352 votes across 53 races on the CVR posted 2026-11-15T00:46:37Z. `tests/projected.test.mjs` checks that each
@@ -72,7 +72,8 @@ no rankings. `site/static/rcv-projected.js` does this in the browser:
   wherever every ballot was scanned.
 - Hand-counted write-ins are the summary's write-ins less the CVR's ballots with a write-in first. The summary has write-ins
   by contest only, so they're shared among districts in proportion to each district's hand-counted votes for candidates, and
-  then spread over ballots with a write-in first like any other first choice. On the CVR posted 2026-11-17T02:41:03Z there
+  then spread over ballots with a write-in first like any other first choice. The simulation adds them too, in whole
+  ballots. On the CVR posted 2026-11-17T02:41:03Z there
   are none; on the earliest, 2026-11-04T11:42:46Z, 215 across 12 races, at most 49 in one.
 - Ballots not yet counted aren't included. The simulation adds those, so the two can name different leaders.
 
@@ -88,7 +89,8 @@ ballots that rank a write-in first, or leave the first rank blank and rank a can
 these together, before the group is reassigned. A ballot with a blank first rank and no candidate after it isn't in them.
 They're the first card, the first column of the rounds chart and table, the map's and district table's "First choices"
 view, and the first level of the ballot rankings, headed "N ballots counted", where Write-in or blank opens to show who
-those ballots rank next. The picker's "all seats" view uses the Division's votes for candidates alone.
+those ballots rank next. The picker's "all seats" view, which loads no ballots, takes each race's Write-in or blank group
+by district from `projection.json`, worked out the same way.
 
 The Division's percentages differ a little: its total has write-ins, but not ballots with a blank first rank, which the
 summary counts as undervotes. Where a share rounds to 50.0% without being half, the page gives it to two or three decimals,
