@@ -5,7 +5,7 @@ import { tabulate } from "./rcv-tabulate.js";
 import { ballotCounts } from "./rcv-rows.js";
 import { measureContest, measuresIn } from "./rcv-measures.js";
 import { $, alaskaTime, el, fmt, pct, strong, watchPointers } from "./rcv-dom.js";
-import { INACTIVE_COLOR, LOW_RANKINGS, ballotsLeft, ballotsLeftInContest, countedBallots, coverage, districtName, districtShares, districts, index, knownRankings, majorityIn, ofRuns, parseStamp, placesOf, prepareContest, projection, readRanking, roundTen, setData, summaryFor, writeInsMatter } from "./rcv-model.js";
+import { INACTIVE_COLOR, LOW_RANKINGS, WRITE_IN_COLOR, ballotsLeft, ballotsLeftInContest, countedBallots, coverage, districtName, districtShares, districts, firstChoices, index, knownRankings, majorityIn, ofRuns, parseStamp, placesOf, prepareContest, projection, readRanking, roundTen, setData, summaryFor, writeInsMatter } from "./rcv-model.js";
 import { renderFlow, roundStory } from "./rcv-flow.js";
 import { renderProjection } from "./rcv-projection.js";
 import { drawMap, paintMap, renderCoverage, renderDots, renderMapLegend, renderMapMode, setLastShares, windAllRings } from "./rcv-districts.js";
@@ -46,23 +46,31 @@ function renderStatus() {
 }
 
 
-// The one line of numbers above the map: round 1 (a ballot measure's votes), the rounds, the simulations, and what's left.
+// The one line of numbers above the map: first choices (a ballot measure's votes), the current result, the simulations, and
+// what's left.
 function renderSummary(c, result) {
   const whole = state.hd === "all";
   const tile = (label, value, detail, link) => el("div", {}, el("dt", {}, label), el("dd", {}, value, el("small", {}, detail, ...(link ? [" ", el("a", { href: link.href }, link.text)] : []))));
   const tiles = [];
   const named = (l, votes, active) => `${c.byLetter[l].short} ${pct(votes[l], active)}`;
-  // Round 1 decides whether there are more rounds, so the line starts with it rather than the Division's first choices.
+  // First choices as marked, not reassigned, with write-in and blank first choices in the total: the count's first column, as
+  // everywhere else on the page.
   const summary = summaryFor(c, state.hd);
-  const { votes, active } = c.measure ? { votes: summary?.votes, active: summary?.total } : result.rounds[0];
-  if (active) {
-    const [top, next] = d3.sort(c.letters, (l) => -votes[l]);
-    tiles.push(tile(c.measure ? "Votes" : "Round 1", named(top, votes, active), `${next ? `${named(next, votes, active)}, ` : ""}${c.measure ? "from" : "counted from"} the Division's results`));
+  const first = c.measure ? { votes: summary?.votes, total: summary?.total, other: null }
+    : result.first ? { votes: result.first.votes, total: result.first.active, other: result.first.votes.W }
+    : { votes: result.rounds[0].votes, total: result.rounds[0].active, other: null };
+  if (first.total) {
+    const [top, next] = d3.sort(c.letters, (l) => -first.votes[l]);
+    const detail = [...(next ? [named(next, first.votes, first.total)] : []), ...(first.other ? [`write-in or blank ${pct(first.other, first.total)}`] : [])].join(", ");
+    tiles.push(tile(c.measure ? "Votes" : "First choices", named(top, first.votes, first.total), c.measure ? `${detail}, from the Division's results` : detail));
   }
-  const last = result.rounds[result.rounds.length - 1];
-  if (result.rounds.length > 1 && last.active) {
-    const [top, next] = d3.sort(c.letters, (l) => -last.votes[l]);
-    tiles.push(tile("Current result after tabulation", named(top, last.votes, last.active), `${named(next, last.votes, last.active)}, if counting stopped now.`, { href: "#rcv-flow", text: "see the ranked choice tabulation" }));
+  // Where Alaska's count would end now: round 1 if someone has a majority there, or the last round.
+  const { stopped } = result;
+  if (!c.measure && c.letters.length > 1 && stopped.rounds[0].active) {
+    const final = stopped.rounds[stopped.rounds.length - 1];
+    const when = stopped.rounds.length === 1 ? "in the 1st round" : "after tabulation";
+    const value = stopped.leader ? `${c.byLetter[stopped.leader].short} wins ${when} with ${pct(final.votes[stopped.leader], final.active)}` : `Tied ${when}`;
+    tiles.push(tile("Current result", value, "if counting stopped now.", { href: "#rcv-flow", text: "see the ranked choice tabulation" }));
   }
   const sim = projection.contests[c.id];
   if (sim) {
@@ -81,33 +89,29 @@ function renderCount(c, hd) {
   const keep = state.keepCounting && c.letters.length > 2;
   const result = keep ? tabulate(countedBallots(c, hd), c.letters, [], { ignoreMajority: true }) : stopped;
 
+  result.first = firstChoices(c, countedBallots(c, hd));
+  result.stopped = stopped;
+
   renderCountText(c, result);
   renderCallout(c, result);
   renderKeepCounting(c, stopped, keep);
-  renderFlow(c, result);
-  renderRounds($("rcv-rounds"), c, result, false);
+  renderFlow(c, result, result.first);
+  renderRounds($("rcv-rounds"), c, result, false, result.first);
   renderTransfers(c, result);
   renderRounds($("rcv-cvr-rounds"), c, tabulate(ballotCounts(c, hd), c.letters), true);
   return result;
 }
 
-// Only a race with three or more candidates has rounds to project. With one or two, the count is round 1, which differs from
-// the Division's first choices by the ballots that rank a write-in or nothing first, so the text gives both.
+// Only a race with three or more candidates has rounds to project. The chart and table show write-in and blank first choices
+// being reassigned, so the text only says why.
 function renderCountText(c, result) {
   const ranked = c.letters.length > 2;
   const notHere = "The simulations in the next section account for ballots not yet counted, so their winning candidates may not match current tabulation results here.";
-  const roundOne = () => {
-    const { votes } = result.rounds[0];
-    const summary = summaryFor(c, state.hd);
-    const shown = d3.sort(c.letters, (l) => -votes[l]);
-    const writeIns = summary?.writeIn ? `, with ${fmt(summary.writeIn)} write-in${summary.writeIn === 1 ? "" : "s"}` : "";
-    return `Counted as AS 15.15.350(d) says, each ballot for its highest-ranked candidate: ${shown.map((l) => `${c.byLetter[l].short} ${fmt(votes[l])}`).join(", ")}.`
-      + (summary?.total ? ` The Division's first choices: ${shown.map((l) => fmt(summary.votes[l])).join(" and ")}${writeIns}.` : "");
-  };
+  const reassigned = result.first ? "Ballots with a write-in or blank first choice are reassigned to the candidate they rank highest (AS 15.15.350(d)). " : "";
   const intro = c.measure ? `The Division's results. ${notHere}`
-    : c.letters.length === 1 ? `${roundOne()} This contest has one candidate, so there are no rounds to run.`
-    : !ranked ? `${roundOne()} With two candidates, no one is eliminated, so there's one round. ${notHere}`
-    : `Round 1 counts each ballot for its highest-ranked candidate, as AS 15.15.350(d) says, so a ballot that ranks a write-in or nothing first counts for the next candidate it ranks. Later rounds are an estimate from scanned ballots with the same first choice. ${notHere}`;
+    : c.letters.length === 1 ? "This contest has one candidate, so there are no rounds to run."
+    : !ranked ? `${reassigned}With two candidates, the one with more votes wins. ${notHere}`
+    : `${reassigned}If a candidate ${result.first ? "then " : ""}has over half the votes, they win in round 1. Otherwise the candidate with the fewest votes is eliminated, one round at a time, until two remain. Later rounds are an estimate from scanned ballots with the same first choice. ${notHere}`;
   $("rcv-count-intro").replaceChildren(el("p", {}, intro));
   $("count-title").textContent = ranked ? "Ranked choice tabulation, for ballots counted so far" : "The count so far";
   document.querySelector("#count .rcv-tag").textContent = ranked ? "Projected from the Division's results" : c.measure ? "Division's results" : "From the Division's results";
@@ -148,39 +152,55 @@ function renderKeepCounting(c, stopped, keep) {
 }
 
 // `full` splits out why ballots aren't counting. The projected rounds only know that for the ballots in the CVR, so they don't.
-function renderRounds(table, c, result, full) {
+// `first` adds the Division's first choices as a column before round 1, with a Write-in row.
+function renderRounds(table, c, result, full, first = null) {
   const { rounds } = result;
+  const columns = first ? [first, ...rounds] : rounds;
+  const shift = first ? 1 : 0;
   // With two candidates, round 1 is the last round, so a majority there decides nothing more than the lead does.
-  const won = c.letters.length > 2 ? majorityIn(rounds) : null;
+  const found = c.letters.length > 2 ? majorityIn(rounds) : null;
+  const won = found && { ...found, round: found.round + shift };
   const cell = (votes, active, majority) => el("td", {}, votes === null ? "" : fmt(votes), votes === null || !active ? "" : el("span", { class: "pct" }, `${pct(votes, active)}${majority ? " · majority" : ""}`));
   const rows = c.order.map((l) => {
-    const eliminatedAt = rounds.findIndex((r) => r.eliminated === l);
+    const eliminatedAt = columns.findIndex((r) => r.eliminated === l);
     return el("tr", {}, el("th", { scope: "row" }, c.byLetter[l].short, el("span", { class: "pct" }, (c.byLetter[l].parties || []).join(", "))),
-      ...rounds.map((r, i) => cell(eliminatedAt >= 0 && i > eliminatedAt ? null : r.votes[l], r.active, won?.round === i && won.letter === l)));
+      ...columns.map((r, i) => cell(eliminatedAt >= 0 && i > eliminatedAt ? null : r.votes[l], r.active, won?.round === i && won.letter === l)));
   });
-  const line = (name, value, cls = "") => el("tr", { class: cls }, el("th", { scope: "row" }, name), ...rounds.map((r) => el("td", {}, fmt(value(r)))));
-  const stoppedIn = (r) => r.exhausted + r.overvotes - rounds[0].overvotes;
+  if (first) rows.push(el("tr", {}, el("th", { scope: "row" }, "Write-in or blank"), ...columns.map((r, i) => cell(i ? null : r.votes.W, r.active, false))));
+  const line = (name, value, cls = "") => el("tr", { class: cls }, el("th", { scope: "row" }, name), ...columns.map((r) => el("td", {}, value(r) === null ? "" : fmt(value(r)))));
+  const setAside = first ? first.transfers.exhausted : 0;
+  const stoppedIn = (r) => (r.firstChoices ? null : setAside + r.exhausted + r.overvotes - rounds[0].overvotes);
   const inactive = full
     ? [line("No candidate ranked", (r) => r.blanks), line("Two candidates at one rank", (r) => r.overvotes), ...(c.measure ? [] : [line("Ran out of rankings", (r) => r.exhausted)])]
-    : [...(rounds.length > 1 ? [line("Needed for a majority", (r) => Math.floor(r.active / 2) + 1)] : []), ...(d3.max(rounds, stoppedIn) > 0 ? [line("Stopped counting", stoppedIn)] : [])];
+    : [...(rounds.length > 1 ? [line("Needed for a majority", (r) => (r.firstChoices ? null : Math.floor(r.active / 2) + 1))] : []), ...(d3.max(rounds, stoppedIn) > 0 ? [line("Stopped counting", stoppedIn)] : [])];
   table.replaceChildren(
-    el("thead", {}, el("tr", {}, el("th", { scope: "col" }, c.measure ? "Choice" : "Candidate"), ...rounds.map((_, i) => el("th", { scope: "col" }, c.measure ? "Votes" : `Round ${i + 1}`)))),
+    el("thead", {}, el("tr", {}, el("th", { scope: "col" }, c.measure ? "Choice" : "Candidate"), ...columns.map((_, i) => el("th", { scope: "col" }, c.measure ? "Votes" : first && i === 0 ? "First choices" : `Round ${i + 1 - shift}`)))),
     el("tbody", {}, ...rows, line(c.measure ? "Total" : "Ballots still in the count", (r) => r.active, "total"), ...inactive),
   );
 }
 
 function renderTransfers(c, result) {
   const drawn = result.rounds[0].active > 0 && c.letters.length > 1;
-  $("rcv-transfers").replaceChildren(...(drawn ? result.rounds.map((r, i) => el("li", {}, `Round ${i + 1}: ${roundStory(c, result, i)}`)) : []));
+  const { first } = result;
+  const columns = first ? [first, ...result.rounds] : result.rounds;
+  $("rcv-transfers").replaceChildren(...(drawn ? columns.map((r, i) => el("li", {}, `${first && i === 0 ? "First choices" : `Round ${i + (first ? 0 : 1)}`}: ${roundStory(c, result, i, first)}`)) : []));
 }
 
 // Drill-down
 
-// First choices come from the Division's summary, which has every counted ballot, with its write-ins for a whole contest.
-// Everything after comes from the CVR.
+// First choices come from the count's first column (firstChoices in rcv-model.js), which has every counted ballot, with
+// write-in and blank first choices together as "W". Everything after comes from the CVR. A ballot reassigned from a write-in
+// or blank first choice has "W" before its candidates, so choosing "W" shows who those ballots rank next.
 function renderDrill(c, ballots) {
-  const read = ballots.map(([pattern, count]) => ({ ...readRanking(pattern, c.letters), count }));
+  const continuing = new Set(c.letters);
+  const read = ballots.map(([pattern, count]) => {
+    const ranking = readRanking(pattern, c.letters);
+    const reassigned = !continuing.has(pattern[0]) && (pattern[0] === "W" || ranking.seq.length > 0);
+    return { ...ranking, seq: reassigned ? ["W", ...ranking.seq] : ranking.seq, count };
+  });
   const summary = summaryFor(c, state.hd);
+  const first = firstChoices(c, countedBallots(c, state.hd));
+  const nameOf = (key) => (key === "W" ? "Write-in or blank" : c.byLetter[key].short);
   // Drop any part of the path that no longer has ballots behind it.
   const valid = [];
   for (const l of state.path) {
@@ -197,16 +217,18 @@ function renderDrill(c, ballots) {
 
   const levels = [];
   // A ballot can name each candidate once, so one block per candidate covers every ranking.
-  for (let depth = 0; depth <= state.path.length && depth < c.letters.length; depth++) {
+  const maxDepth = c.letters.length + (state.path[0] === "W" ? 1 : 0);
+  for (let depth = 0; depth <= state.path.length && depth < maxDepth; depth++) {
     const prefix = state.path.slice(0, depth);
     const here = read.filter((r) => prefix.every((p, i) => r.seq[i] === p));
-    const fromSummary = depth === 0 && summary?.total;
-    const total = fromSummary ? summary.total + (summary.writeIn ?? 0) : d3.sum(here, (r) => r.count);
+    const fromSummary = depth === 0 && (first || summary?.total);
+    const total = !fromSummary ? d3.sum(here, (r) => r.count) : first ? first.active : summary.total + (summary.writeIn ?? 0);
     if (!total) break;
     const counts = new Map();
     if (fromSummary) {
-      for (const l of c.letters) counts.set(l, summary.votes[l]);
-      if (summary.writeIn) counts.set("writeIn", summary.writeIn);
+      for (const l of c.letters) counts.set(l, (first ?? summary).votes[l]);
+      if (first) counts.set("W", first.votes.W);
+      else if (summary.writeIn) counts.set("writeIn", summary.writeIn);
     } else {
       for (const r of here) {
         const key = r.seq.length > depth ? r.seq[depth] : r.end;
@@ -219,31 +241,31 @@ function renderDrill(c, ballots) {
     });
     const buttons = rows.map(([key, count]) => {
       const isCandidate = Boolean(c.color[key]);
-      const name = isCandidate ? c.byLetter[key].short
+      const name = isCandidate || key === "W" ? nameOf(key)
         : key === "writeIn" ? "Write-in"
         : key === "overvotes" ? "Overvote: stops here"
         : depth === 0 ? "No candidate ranked" : "No further ranking";
-      const selected = isCandidate && state.path[depth] === key;
+      const selected = state.path[depth] === key;
       const content = [
         el("span", { class: "top" }, el("span", {}, name), el("span", { class: "num" }, fromSummary ? `${pct(count, total)} · ${fmt(count)}` : `${pct(count, total)} · ${fmt(count)} of ${fmt(total)}`)),
-        el("span", { class: "track" }, el("span", { class: "fill", style: `width:${(count / total) * 100}%;background:${isCandidate ? c.color[key] : INACTIVE_COLOR}` })),
+        el("span", { class: "track" }, el("span", { class: "fill", style: `width:${(count / total) * 100}%;background:${isCandidate ? c.color[key] : key === "W" ? WRITE_IN_COLOR : INACTIVE_COLOR}` })),
       ];
-      if (!isCandidate || depth === c.letters.length - 1) return el("div", { class: "rcv-choice" }, ...content);
+      if (isCandidate ? depth === maxDepth - 1 : key !== "W") return el("div", { class: "rcv-choice" }, ...content);
       return el("button", { type: "button", class: "rcv-choice", "aria-pressed": String(selected), onclick: () => {
         state.path = selected ? state.path.slice(0, depth) : [...prefix, key];
         renderDrill(c, ballots);
       } }, ...content);
     });
     const heading = depth === 0
-      ? el("h3", {}, "First choice", el("small", {}, fromSummary ? `${fmt(total)} votes in the Division's results` : `${fmt(total)} scanned ballots`))
-      : el("h3", {}, `Next after ${prefix.map((l) => c.byLetter[l].short).join(" → ")}`, el("small", {}, `${fmt(total)} scanned ballots`));
+      ? el("h3", {}, "First choice", el("small", {}, !fromSummary ? `${fmt(total)} scanned ballots` : first ? `${fmt(total)} ballots counted` : `${fmt(total)} votes in the Division's results`))
+      : el("h3", {}, `Next after ${prefix.map(nameOf).join(" → ")}`, el("small", {}, `${fmt(total)} scanned ballots`));
     levels.push(el("div", { class: "rcv-level" }, heading, ...buttons));
   }
   $("rcv-drill").replaceChildren(...levels);
   if (!levels.length) $("rcv-drill").append(el("p", { class: "muted" }, "No scanned ballots match this selection."));
 
   const depths = new Map();
-  for (const r of read) depths.set(r.seq.length, (depths.get(r.seq.length) || 0) + r.count);
+  for (const r of read) { const n = r.seq.filter((k) => k !== "W").length; depths.set(n, (depths.get(n) || 0) + r.count); }
   const total = d3.sum(read, (r) => r.count);
   const biggest = d3.max([...depths.values()]) || 1;
   $("rcv-depth").replaceChildren(...[...depths].sort((a, b) => a[0] - b[0]).flatMap(([n, count]) => [

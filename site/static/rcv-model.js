@@ -35,6 +35,7 @@ const CANDIDATE_COLORS = { republican: PARTY_COLORS.republican, democrat: PARTY_
 const OTHER_COLORS = ["#1baf7a", "#a0529e", "#e87ba4"];
 const MEASURE_COLORS = { Y: "#1baf7a", N: "#a0529e" };
 export const INACTIVE_COLOR = "#9aa2ab";
+export const WRITE_IN_COLOR = "#c9c2b6";
 // A ticket counts as its first name's party. The Division lists some candidates with no party at all.
 export function partyOf(candidate) {
   const party = (candidate.parties?.[0] ?? "").split("/")[0];
@@ -119,8 +120,29 @@ export function countedBallots(c, hd = "all") {
   const summary = summaryEntry(c);
   const names = c.candidates.map((x) => x.summaryName ?? x.name);
   if (!summary || names.some((name) => !summary.byDistrict[name])) return ballotCounts(c, hd);
-  c.projected ??= projectedBallots(c, (letter) => summary.byDistrict[names[c.candidates.findIndex((x) => x.letter === letter)]]);
+  c.projected ??= projectedBallots(c, (letter) => summary.byDistrict[names[c.candidates.findIndex((x) => x.letter === letter)]], summary.writeIn ?? 0);
   return hd === "all" ? [...c.projected.values()].flat() : c.projected.get(hd) ?? [];
+}
+
+// First choices, before write-ins are set aside: each candidate's first ranks, and "W" for the ballots that rank a write-in
+// first or skip the first rank and rank a candidate later. Write-ins aren't candidates in the count, so those ballots move to
+// the next candidate they rank, or stop counting. Shaped like a round that eliminates "W", for the chart and table. Null when
+// no ballot moves.
+export function firstChoices(c, ballots) {
+  if (c.measure) return null;
+  const continuing = new Set(c.letters);
+  const votes = Object.fromEntries([...c.letters, "W"].map((l) => [l, 0]));
+  const transfers = { ...Object.fromEntries(c.letters.map((l) => [l, 0])), exhausted: 0, overvotes: 0 };
+  for (const [pattern, count] of ballots) {
+    const read = readBallot(pattern, continuing);
+    if (continuing.has(pattern[0])) votes[pattern[0]] += count;
+    else if (pattern[0] === "W" || continuing.has(read)) {
+      votes.W += count;
+      transfers[continuing.has(read) ? read : "exhausted"] += count;
+    }
+  }
+  if (votes.W <= 0) return null;
+  return { votes, active: sum(Object.values(votes)), eliminated: "W", transfers, exhausted: 0, overvotes: 0, firstChoices: true };
 }
 
 export function districtBallots(hd) {
@@ -201,8 +223,8 @@ export function swarm(points, radius, maxReach = Infinity) {
   return placed;
 }
 
-// Who leads each district, and with what share. In "first" mode, the map's first view, that's of every candidate's votes in
-// round 1 (a ballot measure's yes and no in the summary). In
+// Who leads each district, and with what share. In "first" mode, the map's first view, that's of first choices, with write-in
+// or blank first choices in the total (a ballot measure's yes and no in the summary). In
 // "final" mode it's of the two statewide finalists in the projected final round, as if only they were left. A ballot's final
 // reading doesn't depend on the order of eliminations, so this matches running the count to the end.
 export function districtShares(c, mode = "first") {
@@ -212,8 +234,9 @@ export function districtShares(c, mode = "first") {
   const running = c.order.filter((l) => mode === "first" || l === a || l === b);
   const entry = (hd) => {
     const votes = mode === "first" && c.measure ? summaryFor(c, hd)?.votes ?? tabulate(ballotCounts(c, hd), c.letters).rounds[0].votes
-      : tabulate(countedBallots(c, hd), c.letters, mode === "first" ? [] : removed).rounds[0].votes;
-    const total = sum(running.map((l) => votes[l]));
+      : mode === "first" ? firstChoices(c, countedBallots(c, hd))?.votes ?? tabulate(countedBallots(c, hd), c.letters).rounds[0].votes
+      : tabulate(countedBallots(c, hd), c.letters, removed).rounds[0].votes;
+    const total = sum(running.map((l) => votes[l])) + (votes.W ?? 0);
     const [leader, next] = [...running].sort((p, q) => votes[q] - votes[p]);
     return { hd, votes, total, leader, next, share: total ? votes[leader] / total : null };
   };

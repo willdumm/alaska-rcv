@@ -1,26 +1,34 @@
 // The rounds chart: ribbons of ballots between rounds, one row per candidate.
 import { $, addPlates, fmt, pct, withTip } from "./rcv-dom.js";
-import { INACTIVE_COLOR, majorityIn } from "./rcv-model.js";
+import { INACTIVE_COLOR, WRITE_IN_COLOR, majorityIn } from "./rcv-model.js";
 
 function ribbonPath(x0, x1, y0a, y0b, y1a, y1b) {
   const mid = (x0 + x1) / 2;
   return `M${x0},${y0a}C${mid},${y0a} ${mid},${y1a} ${x1},${y1a}L${x1},${y1b}C${mid},${y1b} ${mid},${y0b} ${x0},${y0b}Z`;
 }
 
-// What happened in a round, in words: who was eliminated and where their ballots went, or how the count ended.
-export function roundStory(c, { rounds }, i) {
-  const round = rounds[i];
+// What happened in a round, in words: who was eliminated and where their ballots went, or how the count ended. With
+// `first`, the Division's first choices (rcv-model.js firstChoices) come before round 1, and `i` counts them as column 0.
+export function roundStory(c, { rounds }, i, first = null) {
+  const columns = first ? [first, ...rounds] : rounds;
+  const round = columns[i];
   const name = (l) => c.byLetter[l].short;
   if (round.eliminated) {
     const moved = round.transfers;
     const parts = c.order.filter((l) => moved[l] >= 0.5).map((l) => `${name(l)} (${fmt(moved[l])})`);
     const stopped = (moved.exhausted || 0) + (moved.overvotes || 0);
+    if (round.firstChoices) {
+      const lead = `Ballots with a write-in or blank first choice (${fmt(round.votes.W)}) are reassigned to the candidate they rank highest`;
+      if (!parts.length) return `${lead}, but none ranks a candidate.`;
+      if (stopped >= 0.5) parts.push(`and ${fmt(stopped)} rank no candidate`);
+      return `${lead}: ${parts.join(parts.length > 2 ? ", " : " ")}.`;
+    }
     const lead = `${name(round.eliminated)} has the fewest votes (${fmt(round.votes[round.eliminated])}) and is eliminated.`;
     if (!parts.length) return `${lead} ${stopped >= 0.5 ? `All ${fmt(stopped)} of those ballots stopped counting.` : "No ballots to move."}`;
     if (stopped >= 0.5) parts.push(`and ${fmt(stopped)} stopped counting`);
     return `${lead} Ballots move to their next choice: ${parts.join(parts.length > 2 ? ", " : " ")}.`;
   }
-  const out = new Set(rounds.map((r) => r.eliminated));
+  const out = new Set(columns.map((r) => r.eliminated));
   const standing = c.order.filter((l) => !out.has(l)).sort((p, q) => round.votes[q] - round.votes[p]);
   const [a, b] = standing;
   const opening = rounds.length > 1 ? "Two candidates remain, so the count ends. " : c.measure ? "" : standing.length > 2 ? `${name(a)} has over half of round 1, so the count ends. ` : "With two candidates, no one is eliminated. ";
@@ -50,22 +58,27 @@ function storyLayout(rounds, width, x, wrapped, storyOf) {
   return { blocks, height: top };
 }
 
-export function renderFlow(c, result) {
+// `first` adds the Division's first choices as a column before round 1, with write-ins set aside between them.
+export function renderFlow(c, result, first = null) {
   const box = $("rcv-flow");
   const { rounds } = result;
+  const columns = first ? [first, ...rounds] : rounds;
+  const shift = first ? 1 : 0;
+  const label = (i) => (c.measure ? "The vote" : first && i === 0 ? "First choices" : `Round ${i + 1 - shift}`);
   box.replaceChildren();
   const drawn = rounds[0].active > 0 && c.letters.length > 1;
-  $("rcv-flow-note").hidden = !drawn || rounds.length === 1;
+  $("rcv-flow-note").hidden = !drawn || columns.length === 1;
   if (!drawn) return;
 
   const width = Math.max(box.clientWidth, 280);
   const phone = width < 560;
   const plotHeight = phone ? 240 : 300;
-  const k = plotHeight / rounds[0].active;
+  const k = plotHeight / columns[0].active;
   const nameHeight = 18;
-  const stoppedAt = (r) => r.exhausted + r.overvotes - rounds[0].overvotes;
-  const nameOf = (l) => (l === "stopped" ? "Stopped counting" : c.byLetter[l].short);
-  const colorOf = (l) => (l === "stopped" ? INACTIVE_COLOR : c.color[l]);
+  const setAside = first ? first.transfers.exhausted : 0;
+  const stoppedAt = (r) => (r.firstChoices ? 0 : setAside + r.exhausted + r.overvotes - rounds[0].overvotes);
+  const nameOf = (l) => (l === "stopped" ? "Stopped counting" : l === "W" ? "Write-in or blank" : c.byLetter[l].short);
+  const colorOf = (l) => (l === "stopped" ? INACTIVE_COLOR : l === "W" ? WRITE_IN_COLOR : c.color[l]);
   const votesIn = (l, r) => (l === "stopped" ? stoppedAt(r) : r.votes[l]);
   const measure = document.createElement("canvas").getContext("2d");
   measure.font = `600 13px ${getComputedStyle(box).fontFamily}`;
@@ -79,16 +92,18 @@ export function renderFlow(c, result) {
   }, []);
   const roundDetail = (round) => (c.measure ? `${fmt(round.active)} votes` : phone ? fmt(round.active) : `${fmt(round.active)} in the count`);
   // Far enough in from each edge that a label centred on the first or last round still fits.
-  const lead = Math.ceil(Math.max(phone ? 30 : 40, textWidth(roundDetail(rounds[0])) / 2, textWidth("eliminated") / 2)) + 3;
-  const x = (i) => (rounds.length === 1 ? width / 2 : lead + (i * (width - 2 * lead)) / (rounds.length - 1));
-  const won = majorityIn(rounds);
+  const lead = Math.ceil(Math.max(phone ? 30 : 40, textWidth(roundDetail(columns[0])) / 2, textWidth("eliminated") / 2)) + 3;
+  const x = (i) => (columns.length === 1 ? width / 2 : lead + (i * (width - 2 * lead)) / (columns.length - 1));
+  // `found` counts rounds, and `won` columns.
+  const found = majorityIn(rounds);
+  const won = found && { ...found, round: found.round + shift };
   const verdict = [];
   if (won) {
     const name = c.byLetter[won.letter].short;
-    const where = rounds.length > 1 ? ` in round ${won.round + 1}` : "";
-    for (const text of wrapped(`Counted so far${won.round ? ", projected" : ""}: ${name} has a majority${where}`)) verdict.push({ text, cls: "strong" });
-    if (won.round < rounds.length - 1) {
-      verdict.push({ cls: "dim", text: won.round === 0
+    const where = columns.length > 1 ? ` in round ${found.round + 1}` : "";
+    for (const text of wrapped(`Counted so far${found.round ? ", projected" : ""}: ${name} has a majority${where}`)) verdict.push({ text, cls: "strong" });
+    if (found.round < rounds.length - 1) {
+      verdict.push({ cls: "dim", text: found.round === 0
         ? fitted("Alaska's count would have stopped at round 1", "The count would stop at round 1")
         : fitted("Alaska's count runs on until two candidates remain, but the winner can't change", "Runs on to two; winner can't change") });
     }
@@ -96,27 +111,26 @@ export function renderFlow(c, result) {
   const verdictHeight = verdict.length * 18 + (verdict.length ? 6 : 0);
   const plotTop = verdictHeight + 40;
 
-  const eliminatedIn = new Set(rounds.map((r) => r.eliminated));
-  const statusOf = (l, i) => (rounds[i].eliminated === l ? (phone ? "out" : "eliminated") : won?.round === i && won.letter === l ? "majority" : null);
+  const eliminatedIn = new Set(columns.map((r) => r.eliminated));
+  const statusOf = (l, i) => (columns[i].eliminated === l ? (l === "W" ? "reassigned" : phone ? "out" : "eliminated") : won?.round === i && won.letter === l ? "majority" : null);
 
-  // Each candidate keeps a row all the way across: finalists on the outside and eliminated candidates
-  // between them, so most ballots moving out of the middle don't cross anyone.
-  const keys = [...c.order.slice(0, 1), ...c.order.slice(2), ...c.order.slice(1, 2)];
-  if (d3.max(rounds, stoppedAt) > 0) keys.push("stopped");
+  // Each candidate keeps a row all the way across, highest first choices at the top.
+  const keys = d3.sort([...c.order, ...(first ? ["W"] : [])], (l) => -columns[0].votes[l]);
+  if (d3.max(columns, stoppedAt) > 0) keys.push("stopped");
   const lanes = new Map();
   let nextY = plotTop;
   for (const l of keys) {
     const hasStatus = eliminatedIn.has(l) || won?.letter === l;
-    const body = Math.max(d3.max(rounds, (r) => votesIn(l, r)) * k, hasStatus ? 60 : 46);
+    const body = Math.max(d3.max(columns, (r) => votesIn(l, r) ?? 0) * k, hasStatus ? 60 : 46);
     lanes.set(l, { top: nextY, mid: nextY + nameHeight + body / 2, index: lanes.size });
     nextY += nameHeight + body + 6;
   }
   const plotBottom = nextY;
-  const stories = storyLayout(rounds, width, x, wrapped, (i) => roundStory(c, result, i));
+  const stories = storyLayout(columns, width, x, wrapped, (i) => roundStory(c, result, i, first));
   const height = plotBottom + stories.height;
 
-  const rows = rounds.map((round, i) => {
-    const out = new Set(rounds.slice(0, i).map((r) => r.eliminated));
+  const rows = columns.map((round, i) => {
+    const out = new Set(columns.slice(0, i).map((r) => r.eliminated));
     const segments = new Map();
     for (const l of keys) {
       const votes = votesIn(l, round);
@@ -180,14 +194,14 @@ export function renderFlow(c, result) {
   svg.append("g").attr("class", "flows").selectAll("path").data(ribbons).join("path")
     .attr("class", "ribbon").attr("d", (d) => d.d).attr("fill", paint).attr("stroke", paint).attr("stroke-width", 0.75)
     .call(withTip, (d) => {
-      if (d.flat) return [fmt(d.votes), `${nameOf(d.source)}, round ${d.flat.i + 1}${d.source === "stopped" ? "" : `: ${pct(d.votes, d.flat.round.active)} of ballots still in the count`}`];
+      if (d.flat) return [fmt(d.votes), `${nameOf(d.source)}, ${label(d.flat.i).toLowerCase()}${d.source === "stopped" ? "" : `: ${pct(d.votes, d.flat.round.active)} of ballots still in the count`}`];
       return [fmt(d.votes), d.moved
-        ? `moved from ${nameOf(d.source)} to ${nameOf(d.target)}, round ${d.round} to ${d.round + 1}`
-        : `stayed with ${nameOf(d.source)}, round ${d.round} to ${d.round + 1}`];
+        ? `moved from ${nameOf(d.source)} to ${nameOf(d.target)}, ${label(d.round - 1).toLowerCase()} to ${label(d.round).toLowerCase()}`
+        : `stayed with ${nameOf(d.source)}, ${label(d.round - 1).toLowerCase()} to ${label(d.round).toLowerCase()}`];
     });
 
   // Once a candidate has a majority, the rest of the count fades back.
-  if (won && won.round < rounds.length - 1) {
+  if (won && won.round < columns.length - 1) {
     svg.append("rect").attr("class", "decided").attr("x", x(won.round)).attr("y", plotTop).attr("width", width - x(won.round)).attr("height", plotBottom - plotTop);
   }
 
@@ -200,7 +214,7 @@ export function renderFlow(c, result) {
     svg.append("line").attr("class", won?.round === i ? "round-line deciding" : "round-line")
       .attr("x1", x(i)).attr("x2", x(i)).attr("y1", plotTop - 4).attr("y2", plotBottom + stories.blocks[i].top - 4);
     const heading = svg.append("text").attr("x", x(i)).attr("text-anchor", "middle");
-    heading.append("tspan").attr("x", x(i)).attr("y", plotTop - 24).attr("class", won && i > won.round ? "dim" : "strong").text(c.measure ? "The vote" : `Round ${i + 1}`);
+    heading.append("tspan").attr("x", x(i)).attr("y", plotTop - 24).attr("class", won && i > won.round ? "dim" : "strong").text(label(i));
     heading.append("tspan").attr("x", x(i)).attr("y", plotTop - 9).attr("class", "dim").text(roundDetail(round));
   }
 
@@ -208,8 +222,8 @@ export function renderFlow(c, result) {
     // The bar the story hangs from, joining it to its round's line.
     svg.append("line").attr("class", won?.round === i ? "round-bar deciding" : "round-bar")
       .attr("x1", left).attr("x2", right).attr("y1", plotBottom + top - 4).attr("y2", plotBottom + top - 4);
-    const story = svg.append("text").attr("text-anchor", rounds.length === 1 ? "middle" : null);
-    lines.forEach((line, n) => story.append("tspan").attr("x", rounds.length === 1 ? width / 2 : left).attr("y", plotBottom + top + 13 + n * STORY_LINE).text(line));
+    const story = svg.append("text").attr("text-anchor", columns.length === 1 ? "middle" : null);
+    lines.forEach((line, n) => story.append("tspan").attr("x", columns.length === 1 ? width / 2 : left).attr("y", plotBottom + top + 13 + n * STORY_LINE).text(line));
   });
 
   for (const l of keys) {

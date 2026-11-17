@@ -25,7 +25,7 @@ export function shade(size, color) {
   return size < MARGIN_BREAKS[0] ? arm[0] : size < MARGIN_BREAKS[1] ? arm[1] : size < MARGIN_BREAKS[2] ? arm[2] : arm[3];
 }
 
-// Hollow dots only mean something for the projected rounds: round 1 rests on first choices, known whether or not a ballot
+// Hollow dots only mean something for the projected rounds: first choices are known whether or not a ballot
 // was scanned.
 const isHollow = (d, shares) => shares.mode === "final" && d.hd !== "all" && lowCoverage(d.hd);
 
@@ -37,7 +37,7 @@ export function renderMapMode(c) {
   if (box.hidden) return;
   const option = (value, text) => el("label", {}, el("input", { type: "radio", name: "rcv-map-mode", value, checked: state.mapMode === value,
     onchange: () => { state.mapMode = value; actions.render(); } }), ` ${text}`);
-  box.replaceChildren(option("first", "Round 1"), option("final", "After ranked choice tabulation, projected"));
+  box.replaceChildren(option("first", "First choices"), option("final", "After ranked choice tabulation, projected"));
 }
 
 // One line per group in a ranking chart, on a background that hides the axis lines and anything else drawn behind its text.
@@ -78,7 +78,7 @@ export function renderDots(c, shares) {
   const svg = d3.select(box).append("svg").attr("viewBox", `0 0 ${width} ${height}`).attr("role", "img")
     .attr("aria-label", `Each district's leader and that candidate's share, grouped by leader. The table below the map has the same numbers.`);
 
-  svg.append("text").attr("x", 4).attr("y", 13).attr("class", "strong").text(shares.mode === "final" ? "District leader's share after tabulation" : "District leader's share of round 1");
+  svg.append("text").attr("x", 4).attr("y", 13).attr("class", "strong").text(shares.mode === "final" ? "District leader's share after tabulation" : "District leader's share of first choices");
   const ticks = x.ticks(width < 500 ? 4 : 5);
   const axis = svg.append("g");
   axis.selectAll("line").data(ticks).join("line").attr("x1", x).attr("x2", x).attr("y1", margin.top - 8).attr("y2", height - margin.bottom)
@@ -139,7 +139,7 @@ export function renderDots(c, shares) {
 export function renderCoverage(c, shares) {
   const rows = Object.keys(coverage.districts).map(Number).filter((hd) => hd > 0).sort((p, q) => p - q);
   $("rcv-coverage-caption").textContent = `Preliminary. ${c.measure ? "Leader is yes or no, as a share of yes and no votes."
-    : !shares ? "No leader: this contest has one candidate." : shares.mode === "final" ? "Leader is the finalist ahead, as a share of the two finalists after the projected ranked choice tabulation." : "Leader is the candidate with the most votes in round 1, as a share of round 1."} Counted is every ballot in the district, in the Division's results. Rankings are known only for scanned ones.`;
+    : !shares ? "No leader: this contest has one candidate." : shares.mode === "final" ? "Leader is the finalist ahead, as a share of the two finalists after the projected ranked choice tabulation." : "Leader is the candidate with the most first choices, as a share of all first choices, write-in or blank included."} Counted is every ballot in the district, in the Division's results. Rankings are known only for scanned ones.`;
   $("rcv-coverage").replaceChildren(
     el("thead", {}, el("tr", {}, ...["District", "Counted", "Scanned", "Rankings known", ...(shares ? ["Leader"] : []), "Ballots left"].map((t) => el("th", { scope: "col" }, t)))),
     el("tbody", {}, ...rows.map((hd) => {
