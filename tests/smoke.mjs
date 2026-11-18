@@ -242,6 +242,27 @@ for (const [text, target] of [["see the ranked choice tabulation", "#rcv-flow"],
   if (!seen.drill.some((t) => t.startsWith("Write-in or blank"))) problems.push("House District 6's ballot rankings have no Write-in or blank button");
   await page.close();
 }
+// Back and Forward step through the contests and districts chosen, and a redraw from a resize adds no step.
+{
+  const house = index.contests.find((c) => c.name === "House District 6").id;
+  const { page, errors } = await opened(context, base);
+  const scope = (start) => page.waitForFunction((s) => document.getElementById("rcv-scope").textContent.startsWith(s), start, { timeout: 15000 });
+  await scope("U.S. Senator, all districts");
+  await page.selectOption("#f-contest", String(house));
+  await scope("House District 6, all districts");
+  await page.selectOption("#f-hd", "6");
+  await scope("House District 6, District 6");
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await page.waitForTimeout(500);
+  const steps = [["back", "House District 6, all districts"], ["back", "U.S. Senator, all districts"], ["forward", "House District 6, all districts"]];
+  for (const [way, start] of steps) {
+    await (way === "back" ? page.goBack() : page.goForward());
+    await scope(start).catch(() => problems.push(`${way} doesn't show "${start}"`));
+  }
+  if (await page.$eval("#f-contest", (s) => s.value) !== String(house)) problems.push("after Back and Forward the contest picker is out of step");
+  problems.push(...errors.map((e) => `Back and Forward: ${e}`));
+  await page.close();
+}
 // The district picker uses the Division's names.
 {
   const { page } = await opened(context, base);

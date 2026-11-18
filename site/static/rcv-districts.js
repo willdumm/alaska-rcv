@@ -279,6 +279,8 @@ function clearSmallOutlines(labels, outlines) {
 // Charts are sized to their boxes, so this draws again only when the box's width changes, or a contest
 // needs a different view: a State Senate race shows just its house districts, close up.
 let mapView = null, mapPanels = [];
+// The state map's shapes, made once so their lines are too (districtLines).
+let stateFeatures = null;
 export function drawMap() {
   const box = $("rcv-map");
   const width = Math.max(box.clientWidth, 280);
@@ -319,7 +321,7 @@ export function drawMap() {
   });
 
   // The state map fits the outlines too, since Southeast's reaches past the land.
-  const features = districts.features.map(withoutFarWest);
+  const features = (stateFeatures ??= districts.features.map(withoutFarWest));
   const everything = { type: "GeometryCollection", geometries: [...features.map((f) => f.geometry), ...views.map((v) => v.outline)] };
   const whole = albers(-154).fitWidth(width, everything);
   const height = Math.ceil(d3.geoPath(whole).bounds(everything)[1][1]);

@@ -279,7 +279,7 @@ function selectContest(id) {
   state.hd = "all";
   state.path = [];
   state.keepCounting = false;
-  return render();
+  return navigate();
 }
 
 function selectDistrict(hd) {
@@ -287,7 +287,7 @@ function selectDistrict(hd) {
   if (currentContest.value?.chamber) { if (race) selectContest(race.id); return; }
   state.hd = state.hd === hd ? "all" : hd;
   state.keepCounting = false;
-  render();
+  navigate();
 }
 
 // Filters
@@ -316,6 +316,7 @@ const defaultContest = () => index.contests.find((x) => x.name === "U.S. Senator
 
 function readURL() {
   state.contest = defaultContest();
+  state.hd = "all";
   const q = new URLSearchParams(location.search);
   const contest = Number(q.get("contest"));
   if ([...index.contests, ...measures].some((x) => x.id === contest)) state.contest = contest;
@@ -329,7 +330,18 @@ function writeURL() {
   if (state.contest !== defaultContest()) q.set("contest", state.contest);
   if (state.hd !== "all") q.set("hd", state.hd);
   const text = q.toString();
-  history.replaceState(null, "", text ? `?${text}` : location.pathname);
+  const url = text ? `?${text}` : location.pathname;
+  if (pushURL && (text ? `?${text}` : "") !== location.search) history.pushState(null, "", url);
+  else history.replaceState(null, "", url);
+  pushURL = false;
+}
+
+// A reader choosing a contest or district gets a new history entry, so Back returns to the one before. Anything else that
+// redraws (a resize, a check that tidies the URL on load) rewrites the current entry.
+let pushURL = false;
+function navigate() {
+  pushURL = true;
+  return render();
 }
 
 function renderDistrictWarning() {
@@ -457,10 +469,16 @@ async function main() {
     if (isChamber(value)) state.hd = "all";
     state.path = [];
     state.keepCounting = false;
-    render();
+    navigate();
   });
   $("f-hd").addEventListener("change", (event) => {
     state.hd = event.target.value === "all" ? "all" : Number(event.target.value);
+    state.keepCounting = false;
+    navigate();
+  });
+  addEventListener("popstate", () => {
+    readURL();
+    state.path = [];
     state.keepCounting = false;
     render();
   });

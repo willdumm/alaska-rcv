@@ -151,8 +151,14 @@ export function districtBallots(hd) {
 }
 
 // The map's lines, as line shapes. Neighbours' shapes use the very same points along a border, so an edge in two districts is
-// a border and an edge in one is coast.
+// a border and an edge in one is coast. The shapes never change, so each list of them is worked out once.
+const linesOf = new WeakMap();
 export function districtLines(features) {
+  if (!linesOf.has(features)) linesOf.set(features, linesFor(features));
+  return linesOf.get(features);
+}
+
+function linesFor(features) {
   const ringsOf = ({ geometry: { type, coordinates } }) => (type === "MultiPolygon" ? coordinates.flat() : coordinates);
   const edgeOf = (a, b) => { const p = a.join(), q = b.join(); return p < q ? `${p}|${q}` : `${q}|${p}`; };
   const ownerOf = new Map(), shared = new Set();
@@ -208,12 +214,18 @@ export function majorityIn(rounds) {
   return null;
 }
 
-// Offsets each point's y from its line by as little as keeps it from touching the ones already placed.
+// Offsets each point's y from its line by as little as keeps it from touching the ones already placed. Points go in order of x,
+// so only those placed within a diameter to the left can touch: `near` starts at the first of them.
 export function swarm(points, radius, maxReach = Infinity) {
   const placed = [];
   const offset = (step) => (step % 2 ? (step + 1) / 2 : -step / 2);
+  let near = 0;
   for (const point of [...points].sort((p, q) => p.x - q.x)) {
-    const clear = (y) => placed.every((o) => (o.x - point.x) ** 2 + (o.y - y) ** 2 >= (2 * radius) ** 2);
+    while (near < placed.length && point.x - placed[near].x >= 2 * radius) near++;
+    const clear = (y) => {
+      for (let i = near; i < placed.length; i++) if ((placed[i].x - point.x) ** 2 + (placed[i].y - y) ** 2 < (2 * radius) ** 2) return false;
+      return true;
+    };
     let step = 0;
     while (Math.abs(offset(step)) <= maxReach && !clear(offset(step))) step++;
     if (Math.abs(offset(step)) > maxReach) continue;
