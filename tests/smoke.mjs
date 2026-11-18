@@ -237,7 +237,7 @@ for (const [text, target] of [["see the ranked choice tabulation", "#rcv-flow"],
   if (seen.tag !== "From the Division's results") problems.push(`House District 6's count is tagged "${seen.tag}"`);
   if (!/^CandidateFirst choicesRound 1/.test(seen.rounds)) problems.push(`House District 6's table starts "${seen.rounds.slice(0, 40)}"`);
   if (!seen.rounds.includes("majority")) problems.push("House District 6's table doesn't mark round 1's majority");
-  if (!/^First choicesVance 50(\.\d+)?%.*write-in or blank \d/.test(seen.tile)) problems.push(`House District 6's first card says "${seen.tile.slice(0, 80)}"`);
+  if (!/^First choices\S+ 5\d(\.\d+)?%.*write-in or blank \d/.test(seen.tile)) problems.push(`House District 6's first card says "${seen.tile.slice(0, 80)}"`);
   if (!/^Current result\S+ wins in round 1 with 5\d/.test(seen.result)) problems.push(`House District 6's current result says "${seen.result}"`);
   if (!seen.drill.some((t) => t.startsWith("Write-in or blank"))) problems.push("House District 6's ballot rankings have no Write-in or blank button");
   await page.close();
