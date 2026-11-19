@@ -55,7 +55,7 @@ nix shell nixpkgs#nodejs nixpkgs#poppler-utils nixpkgs#unzip -c bash
 1. Copy a snapshot from the watcher to its own directory outside this repo, as `RAW_DIR`. Or `bash scripts/refresh.sh fetch RAW_DIR CACERT`
    downloads `CVR_Export.zip`, `ElectionSummaryReportRPT.pdf` and `GA_ENR_Precinct_State_of_Alaska.csv` from
    `https://www.elections.alaska.gov/enr/26GENR/results/`, and the "ballots received" table from
-   https://www.elections.alaska.gov/election-results/e/, with their response headers.
+   https://www.elections.alaska.gov/election-results/e/?id=26genr (the bare `e/` URL can serve a stale copy), with their response headers.
 2. `build` writes `RAW_DIR/received.json` from the saved table with `received_from_table.mjs`, unless it's already there:
    `{"asOf": "Nov 3, 2026, 12:26 PM", "received": 105419, "issued": 126521}`. It stops if the table's rows don't add up to its total.
    That total includes the table's questioned ballots (143 on November 4) and special needs ballots (286). `build_coverage.py`

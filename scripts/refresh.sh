@@ -16,7 +16,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 root=$(dirname "$here")
 python=${PYTHON:-python3}
 base=https://www.elections.alaska.gov/enr/26GENR/results
-received_page=https://www.elections.alaska.gov/election-results/e/
+received_page="https://www.elections.alaska.gov/election-results/e/?id=26genr"
 files=(CVR_Export.zip ElectionSummaryReportRPT.pdf GA_ENR_Precinct_State_of_Alaska.csv)
 
 # date reads an empty string as today at midnight, so a missing header has to stop here.
