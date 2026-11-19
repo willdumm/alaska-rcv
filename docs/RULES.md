@@ -44,6 +44,27 @@ The Division doesn't publish what it does with a ballot that ranks the same cand
 repeat as a skipped rank, so a repeat next to a blank rank stops the ballot. This is inferred: it's what reproduces the
 certified 2024 reports exactly. RCTab has no setting for it, and passes over a repeat without counting it as skipped.
 
+Unresolved write-ins count as one candidate for this, as they do in the Division's count: a write-in ranked after a
+write-in is a repeat, though the voter may have written two different names. The 2026 reports showed it. One ballot ranked
+write-ins first, second and third and then a candidate, and the Division counted it as blank in U.S. Representative, Senate
+District S and House District 37. Before November 19, 2026 the page passed over every write-in rank and counted that ballot
+for the candidate. No 2024 ballot in a contest with a report is counted differently by the two rules.
+
+We don't think the Division's handling is correct, and the page follows it only so that its count matches the Division's.
+The CVR doesn't say whether those write-ins name one person or several, and under 6 AAC 25.071 defeated write-ins aren't
+candidates in the count at all, so the ballot's three write-in ranks should be passed over, the way a single write-in rank
+is, and it should count for the candidate it ranks next. If this ballot decided a race, the page's count would be wrong.
+
+### The Division's 2026 reports
+
+On November 18, 2026 the Division posted 15 unofficial round-by-round reports, from the CVR posted 2026-11-19T02:57:53Z, the
+first with every ballot scanned. `validate_2024.mjs` (which takes any year's reports) matches every number in every round of
+all 15. One difference is left, in where the count stops. In Senate District C, Stutes has 7,365 of 14,653 continuing ballots
+(50.26%) in round 1, a majority under AS 15.15.350, so the page stops there. The Division's report, with "Declare winners
+by threshold: False", goes on to eliminate Harris and elects Stutes in round 2. The winner is the same. The Division posted
+reports for Senate District C and House District 24, which have a round 1 majority only once write-in and blank first
+choices move to their next candidate, and none for any other contest with a round 1 majority.
+
 ### What the CVR can't show
 
 - The Division's description of the file, from its [2026 results page](https://www.elections.alaska.gov/election-results/e/):
@@ -141,7 +162,7 @@ that's not a primary source. Recheck it before relying on this.
 
 ## Verification
 
-None of these show that 2026 will match the Division's count. The Division publishes no 2026 rounds until November 18, 2026.
+The 2026 reports themselves are compared under "The Division's 2026 reports" above. The checks below came first, while counting went on.
 
 **Certified 2024 reports.** `scripts/validate_2024.mjs` runs the page's tabulator over the 2024 CVR and compares it with all 9
 of the Division's certified round-by-round reports: 0 differences.
@@ -157,7 +178,8 @@ repeated-ranking rule above.
 | 2024 general | 41 | 64 | 35 | 6 | 0 |
 
 Those differences are small: at most 21 votes for one candidate in one round in 2026, and 9 in 2024. In 2024, our side of each
-one is what matches the certified reports.
+one is what matches the certified reports. Both runs predate the November 19, 2026 change that counts a write-in after a
+write-in as a repeat, and the final 2026 CVR hasn't been run through RCTab.
 
 RCTab's setup differs from the Division's in ways the comparison needs: it continues to two candidates even after a first-round
 majority, passes over the write-in as an excluded candidate, and breaks ties by candidate order. `prepare_rctab.py` lists them.

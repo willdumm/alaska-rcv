@@ -67,8 +67,11 @@ test("a repeated ranking counts as a blank rank", () => {
   assert.equal(readBallot("AB", running("B")), "B");
 });
 
-test("a repeated write-in isn't a repeat: names aren't known", () => {
-  assert.equal(readBallot("WWWA", running("A")), "A");
+// The Division's 2026 reports count one WWWA ballot this way, though the write-ins may name different people (docs/RULES.md).
+test("a write-in after a write-in is a repeat, as the Division counts it", () => {
+  assert.equal(readBallot("WWA", running("A")), "A");
+  assert.equal(readBallot("WWWA", running("A")), "exhausted");
+  assert.equal(readBallot("W-WA", running("A")), "exhausted");
 });
 
 test("inactive ballots land in the right pile", () => {

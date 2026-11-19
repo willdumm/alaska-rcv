@@ -1,6 +1,6 @@
-// Runs the page's tabulator over the 2024 CVR and compares every number with the Division's
-// certified round-by-round reports, as pdftotext -layout text.
-// Usage: node validate_2024.mjs EXTRACTED_2024_DIR REPORT.txt [REPORT.txt ...]
+// Runs the page's tabulator over an extracted CVR (the 2024 general, or 2026's data directory) and compares every number with
+// the Division's round-by-round reports, as pdftotext -layout text.
+// Usage: node validate_2024.mjs EXTRACTED_DIR REPORT.txt [REPORT.txt ...]
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tabulate } from "../site/static/rcv-tabulate.js";

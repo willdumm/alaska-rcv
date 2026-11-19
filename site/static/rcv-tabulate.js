@@ -8,8 +8,8 @@ export const INACTIVE = { BLANK: "blanks", EXHAUSTED: "exhausted", OVERVOTE: "ov
 // What a ranking counts for while `continuing` candidates remain: a letter, or a reason it's inactive.
 // A write-in rank is passed over, but it isn't a skipped rank. An overvote stops the ballot, even if
 // every candidate in it has been eliminated. Two blank ranks in a row stop it too, and a rank repeating
-// a candidate already ranked counts as blank. The Division doesn't publish that last rule; it's what
-// reproduces its certified 2024 reports exactly (see docs/RULES.md).
+// a candidate already ranked counts as blank, a write-in repeating a write-in included. The Division
+// doesn't publish that last rule; it's what reproduces its 2024 and 2026 reports exactly (see docs/RULES.md).
 export function readBallot(pattern, continuing) {
   let skipped = 0;
   const ranked = new Set();
@@ -19,7 +19,7 @@ export function readBallot(pattern, continuing) {
       continue;
     }
     skipped = 0;
-    if (char !== "W") ranked.add(char);
+    ranked.add(char);
     if (char === "*") return INACTIVE.OVERVOTE;
     if (continuing.has(char)) return char;
   }
