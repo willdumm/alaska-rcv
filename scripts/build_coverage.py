@@ -115,7 +115,7 @@ def questioned_received(table_path, total):
     return number(row.group(1))
 
 
-def main(report_path, csv_path, ballots_path, received_path, table_path, cvr_modified, fetched, out_path):
+def main(report_path, csv_path, ballots_path, received_path, table_path, cvr_modified, fetched, out_path, final=""):
     report, contests = parse_report(report_path)
     districts, votes = parse_precincts(csv_path)
     with open(ballots_path, encoding="utf-8") as f:
@@ -151,6 +151,8 @@ def main(report_path, csv_path, ballots_path, received_path, table_path, cvr_mod
         json.dump({
             "report": report, "cvrLastModified": cvr_modified, "fetched": fetched, "received": received,
             "cvrBallotsByGroup": cvr["ballotsByGroup"], "districts": out_districts, "contests": out_contests,
+            # The Division has counted every ballot, so the page shows results rather than estimates (refresh.sh build --final).
+            **({"final": True} if final == "--final" else {}),
         }, f, separators=(",", ":"))
 
 

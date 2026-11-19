@@ -2,7 +2,8 @@
 # The refresh steps in scripts/README.md, and the check to run before any deploy.
 #   refresh.sh watch STORE CACERT          Save a new snapshot in STORE if the Division changed a file or its received table
 #   refresh.sh fetch RAW_DIR CACERT        Download the Division's three files and received table, each with its response headers
-#   refresh.sh build RAW_DIR DATA_DIR      Extract, rebuild coverage.json and projection.json, and check them
+#   refresh.sh build RAW_DIR DATA_DIR [--final]  Extract, rebuild coverage.json and projection.json, and check them.
+#                                          --final: the Division has counted every ballot, so nothing is left to estimate
 #   refresh.sh keep BUILT_DIR DATA_DIR     Keep a build as one of the page's versions, and rewrite versions.json
 #   refresh.sh versions DATA_DIR           Check the vote totals and simulation of every version. In CI
 #   refresh.sh check DATA_DIR CACERT       The pre-deploy check. Exits with an error if anything is off
@@ -136,7 +137,8 @@ $(printf '%s\n' "${news[@]}")" 0
 }
 
 build() {
-  local raw=$1 data=$2 posted_at fetched_at
+  local raw=$1 data=$2 final=${3:-} posted_at fetched_at
+  [ -z "$final" ] || [ "$final" = --final ] || usage
   [ -s "$raw/received.json" ] || node "$here/received_from_table.mjs" "$raw/ballots-received-table.html" > "$raw/received.json"
   test -s "$raw/ballots-received-table.html" || grep -q '"questionedNote"' "$raw/received.json" || { echo "No $raw/ballots-received-table.html: see scripts/README.md" >&2; exit 1; }
   raw=$(cd "$raw" && pwd)
@@ -151,7 +153,7 @@ build() {
   # About 1 GB, and the zip it came from is kept.
   rm -rf "$raw/cvr"
   "$python" -I "$here/build_coverage.py" "$raw/summary.txt" "$raw/GA_ENR_Precinct_State_of_Alaska.csv" "$data/ballots.json" \
-    "$raw/received.json" "$raw/ballots-received-table.html" "$posted_at" "$fetched_at" "$data/coverage.json"
+    "$raw/received.json" "$raw/ballots-received-table.html" "$posted_at" "$fetched_at" "$data/coverage.json" ${final:+"$final"}
   node "$here/simulate_projection.mjs" "$data" "$data/projection.json" --runs 1000 "${sim_settings[@]}"
   local throwaway
   throwaway=$(mktemp)
@@ -224,14 +226,14 @@ gh release create $release $(echo $names) --notes-file NOTES -R willdumm/alaska-
 NEXT
 }
 
-usage() { sed -n 2,10p "$0"; exit 2; }
+usage() { sed -n 2,11p "$0"; exit 2; }
 command=${1:-}
 [ $# -gt 0 ] && shift
 needs() { [ "$1" = "$2" ] || usage; }
 case "$command" in
   watch) needs $# 2; watch "$@" ;;
   fetch) needs $# 2; fetch "$@" ;;
-  build) needs $# 2; build "$@" ;;
+  build) [ $# = 2 ] || needs $# 3; build "$@" ;;
   keep) needs $# 2; node "$here/build_versions.mjs" "$@" ;;
   versions) needs $# 1; versions "$@" ;;
   check) needs $# 2; check "$@" ;;

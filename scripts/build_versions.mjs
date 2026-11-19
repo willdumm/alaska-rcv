@@ -1,12 +1,13 @@
 // Keeps a built data directory as one of the page's versions, and rewrites the list of them.
 // Usage: node build_versions.mjs BUILT_DIR DATA_DIR
 //        node build_versions.mjs --id BUILT_DIR   Print the build's version ID, and do nothing else
-// Copies BUILT_DIR to DATA_DIR/versions/ID/ and writes DATA_DIR/versions.json. BUILT_DIR can be DATA_DIR itself. Each version
+// Copies BUILT_DIR to DATA_DIR/versions/ID/ and writes DATA_DIR/versions.json and DATA_DIR/history.json. BUILT_DIR can be DATA_DIR itself. Each version
 // has every file the page and the simulation read, so the tools need no special case. Files that don't change between versions
 // cost nothing: git and Cloudflare both store identical files once.
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { writeHistory } from "./build_history.mjs";
 import { readJson } from "./lib.mjs";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -57,11 +58,15 @@ export function manifestEntry(coverage) {
     counted: coverage.report.votersCast,
     received: coverage.received.received,
     ...(coverage.received.questionedNote ? { note: coverage.received.questionedNote } : {}),
+    ...(coverage.final ? { final: true } : {}),
   };
 }
 
 // What the Division had posted, from a coverage.json. A version can be rebuilt with new code, but not replaced by other data.
 const sources = ({ cvrLastModified, report, received }) => JSON.stringify([cvrLastModified, report.stamp, report.votersCast, received.asOf, received.received]);
+
+// What's about every version at once, and so belongs to none of them.
+export const ACROSS_VERSIONS = ["versions", "versions.json", "history.json"];
 
 function keep(built, data) {
   const coverage = readJson(join(built, "coverage.json"));
@@ -73,7 +78,7 @@ function keep(built, data) {
   rmSync(target, { recursive: true, force: true });
   mkdirSync(target, { recursive: true });
   for (const name of readdirSync(built)) {
-    if (name !== "versions" && name !== "versions.json") cpSync(join(built, name), join(target, name));
+    if (!ACROSS_VERSIONS.includes(name)) cpSync(join(built, name), join(target, name));
   }
   return id;
 }
@@ -96,6 +101,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (!existsSync(join(built, "coverage.json")) || !data) throw new Error("usage: build_versions.mjs BUILT_DIR DATA_DIR");
   const id = keep(built, data);
   const versions = writeManifest(data);
+  writeHistory(data);
   const main = versionId(readJson(join(data, "coverage.json")));
   if (main !== versions[0].id) throw new Error(`${data} has version ${main}, but the newest is ${versions[0].id}: build the newest there`);
   console.log(`Kept version ${id}. ${versions.length} versions, the newest ${versions[0].id}.`);

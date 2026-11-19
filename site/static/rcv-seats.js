@@ -1,7 +1,8 @@
 // The picker's "all seats" views: a whole chamber on the map, and its seats per party across the simulations. These use the
-// Division's summary and projection.json, without loading each race's ballots.
+// Division's summary and projection.json, without loading each race's ballots. In the final count there's nothing left to
+// simulate, so every simulation ends the same way: its winner is the race's winner, and the "final" views show who won.
 import { $, el, fmt, pct, withTip } from "./rcv-dom.js";
-import { MIDDLE, coverage, ofRuns, projection } from "./rcv-model.js";
+import { MIDDLE, coverage, isFinal, ofRuns, projection } from "./rcv-model.js";
 import { PARTY_GROUPS, partyGroup, rankedOutcomes, runsFromOutcomes, senateSeatOf } from "./rcv-chambers.js";
 import { drawGroupHeadings, highlightDistricts, marginArm, shade } from "./rcv-districts.js";
 import { actions, state } from "./rcv-state.js";
@@ -25,6 +26,7 @@ function raceSummary(race) {
     short: lastNames.indexOf(lastNames[i]) === lastNames.lastIndexOf(lastNames[i]) ? lastNames[i] : x.name,
     votes: Object.values(byDistrict[x.name] ?? {}).reduce((a, b) => a + b, 0),
     wins: projection.contests[race.id] ? projection.contests[race.id].winners[x.letter]?.wins ?? 0 : null,
+    wonWith: projection.contests[race.id]?.winners[x.letter]?.medianShare ?? null,
   }));
   const total = candidates.reduce((sum, x) => sum + x.votes, 0) + d3.sum(Object.values(race.writeInOrBlank ?? {}));
   const [leader, next] = d3.sort(candidates, (x) => -x.votes);
@@ -73,7 +75,7 @@ function mapShares(c) {
       return `Senate ${seat.seat} isn't on this ballot: ${seat.name}, ${seat.party}, until ${seat.until}`;
     }
     if (!hasRunner(race)) return `${race.seat}: ${withParty(race.leader)} is the only candidate`;
-    if (state.mapMode === "final") return `${race.seat}: ${withParty(race.simWinner)} wins ${ofRuns(race.simWinner.wins)} simulations`;
+    if (state.mapMode === "final") return isFinal() ? `${race.seat}: ${withParty(race.simWinner)} won with ${pct(race.simWinner.wonWith, 1)} after ranked choice tabulation` : `${race.seat}: ${withParty(race.simWinner)} wins ${ofRuns(race.simWinner.wins)} simulations`;
     if (!race.total) return `${race.seat}: no votes yet`;
     const whole = `${race.seat}: ${firstChoicesLine(race.candidates, race.total)}`;
     if (race.hds.length === 1) return whole;
@@ -90,15 +92,18 @@ function renderModes() {
   box.hidden = false;
   const option = (value, text) => el("label", {}, el("input", { type: "radio", name: "rcv-map-mode", value, checked: state.mapMode === value,
     onchange: () => { state.mapMode = value; actions.render(); } }), ` ${text}`);
-  box.replaceChildren(option("first", "First choices"), option("final", "Simulations"));
-  $("districts").querySelector(".rcv-tag").textContent = state.mapMode === "first" ? "Division's results" : "Simulated";
+  box.replaceChildren(option("first", "First choices"), option("final", isFinal() ? "Winners" : "Simulations"));
+  $("districts").querySelector(".rcv-tag").textContent = state.mapMode === "first" || isFinal() ? "Division's results" : "Simulated";
 }
 
 function renderLegend(c) {
   const swatch = (color) => el("i", { style: `background:${color}` });
-  const groups = PARTY_GROUPS.flatMap((g) => [el("span", { class: "ramp", "aria-hidden": "true" }, ...marginArm(g.color).map(swatch)), g.name]);
+  // A final count's winners won every simulation, so they take only the darkest band.
+  const solid = state.mapMode !== "first" && isFinal();
+  const groups = PARTY_GROUPS.flatMap((g) => [el("span", { class: "ramp", "aria-hidden": "true" }, ...(solid ? marginArm(g.color).slice(-1) : marginArm(g.color)).map(swatch)), g.name]);
   const bands = state.mapMode === "first"
     ? `Bands: a lead of under 2.5, to 10, to 25, and over 25 points, for the party of the first-choice leader${c.id === "senate" ? " in each house district" : ""}.`
+    : isFinal() ? "Each seat in its winner's party color."
     : `Bands: the party of the candidate winning most simulations, in under ${SIM_BREAKS[0]}, to ${SIM_BREAKS[1]}, to ${SIM_BREAKS[2]}, and ${SIM_BREAKS[2]} or more of ${fmt(projection.parameters.runs)}.`;
   $("rcv-map-legend").replaceChildren(...groups, el("span", {}, `${bands} ${c.chamber.notOnBallot.length ? "Darker gray: not on this ballot." : ""}`));
 }
@@ -112,7 +117,7 @@ function renderSeatDots(c) {
   box.replaceChildren();
   const rows = c.races.filter((race) => hasRunner(race) && (!first || race.total)).map((race) => {
     const who = first ? race.leader : race.simWinner;
-    return { race, who, share: first ? who.votes / race.total : who.wins / runs };
+    return { race, who, share: first ? who.votes / race.total : isFinal() ? who.wonWith : who.wins / runs };
   });
   const groups = PARTY_GROUPS.map((g) => ({ g, members: d3.sort(rows.filter((d) => d.who.group === g.key), (d) => -d.share) })).filter(({ members }) => members.length);
   const lines = groups.flatMap((group) => [group, ...group.members]);
@@ -124,26 +129,27 @@ function renderSeatDots(c) {
   const high = Math.max(0.55, Math.ceil((d3.max(rows, (d) => d.share) ?? 0.5) * 20) / 20);
   const x = d3.scaleLinear([low, high], [margin.left, width - margin.right]);
   const y = (d) => margin.top + lines.indexOf(d) * rowHeight;
-  const label = first ? "of first choices" : "simulations won";
+  const won = !first && isFinal();
+  const label = first ? "of first choices" : won ? "after ranked choice tabulation" : "simulations won";
   const svg = d3.select(box).append("svg").attr("class", "rcv-seat-dots").attr("viewBox", `0 0 ${width} ${height}`).attr("role", "group")
-    .attr("aria-label", `Every contested seat's top candidate and that candidate's ${first ? "share of first choices" : "simulations won"}, grouped by party. Choose one to open its race.`);
-  svg.append("text").attr("x", 4).attr("y", 13).attr("class", "strong").text(first ? "Leader's share of first choices" : `Most frequent winner's simulations won, of ${fmt(runs)}`);
+    .attr("aria-label", `Every contested seat's ${won ? "winner and their share after ranked choice tabulation" : `top candidate and that candidate's ${first ? "share of first choices" : "simulations won"}`}, grouped by party. Choose one to open its race.`);
+  svg.append("text").attr("x", 4).attr("y", 13).attr("class", "strong").text(first ? "Leader's share of first choices" : won ? "Winner's share after ranked choice tabulation" : `Most frequent winner's simulations won, of ${fmt(runs)}`);
   const ticks = x.ticks(width < 500 ? 4 : 5);
   const axis = svg.append("g");
   axis.selectAll("line").data(ticks).join("line").attr("x1", x).attr("x2", x).attr("y1", margin.top - 8).attr("y2", height - margin.bottom)
     .attr("stroke", (d) => (d === 0.5 ? "#a9b0b8" : "#e6e8eb"));
   axis.selectAll("text").data(ticks).join("text").attr("x", x).attr("y", margin.top - 13).attr("text-anchor", "middle").attr("class", "dim")
-    .text((d) => (first ? `${Math.round(d * 100)}%` : fmt(d * runs)));
+    .text((d) => (first || won ? `${Math.round(d * 100)}%` : fmt(d * runs)));
 
   const open = (d) => actions.selectContest(d.race.id);
   const row = svg.append("g").selectAll("g").data(rows).join("g").attr("class", "row")
     .attr("transform", (d) => `translate(0,${y(d)})`).attr("role", "link").attr("tabindex", 0)
-    .attr("aria-label", (d) => `${d.race.seat}, ${withParty(d.who)}, ${first ? pct(d.share, 1) : ofRuns(d.who.wins)} ${label}`);
+    .attr("aria-label", (d) => `${d.race.seat}, ${withParty(d.who)}, ${first || won ? pct(d.share, 1) : ofRuns(d.who.wins)} ${label}`);
   row.append("rect").attr("class", "hit").attr("width", width).attr("height", rowHeight).attr("fill", "transparent").attr("rx", 3);
   row.append("text").attr("x", 4).attr("y", rowHeight / 2 + 4).text((d) => d.race.seat);
   row.append("circle").attr("cx", (d) => x(d.share)).attr("cy", rowHeight / 2).attr("r", 5).attr("fill", (d) => colorOfGroup[d.who.group]).attr("stroke", "#fff").attr("stroke-width", 2);
   row.append("text").attr("x", width - 4).attr("y", rowHeight / 2 + 4).attr("text-anchor", "end").text((d) => d.who.short);
-  row.call(withTip, (d) => first ? [pct(d.share, 1), d.race.seat, firstChoicesLine(d.race.candidates, d.race.total)] : [ofRuns(d.who.wins), d.race.seat, `${withParty(d.who)} wins ${ofRuns(d.who.wins)} simulations`],
+  row.call(withTip, (d) => first ? [pct(d.share, 1), d.race.seat, firstChoicesLine(d.race.candidates, d.race.total)] : won ? [pct(d.share, 1), d.race.seat, `${withParty(d.who)} won`] : [ofRuns(d.who.wins), d.race.seat, `${withParty(d.who)} wins ${ofRuns(d.who.wins)} simulations`],
     { over: (d) => highlightDistricts(d.race.hds), out: () => highlightDistricts([]), act: open });
   row.on("keydown", (event, d) => { if (event.key === "Enter") open(d); })
     .on("focus.map", (event, d) => highlightDistricts(d.race.hds))
@@ -164,8 +170,14 @@ function renderSummaryTiles(c, perRun) {
   const leaders = Object.fromEntries(PARTY_GROUPS.map((g) => [g.key, c.races.filter((r) => r.total && r.leader.group === g.key).length + c.chamber.notOnBallot.filter((s) => partyGroup(s.party) === g.key).length]));
   const line = (of) => PARTY_GROUPS.map((g) => of(g)).join(" · ");
   const left = d3.sum(c.races, (r) => { const b = projection.contests[r.id]?.ballots; return b ? b.uncounted + b.questioned : 0; });
+  const ofSeats = `Republican, Democrat, others: seats of ${c.chamber.seats}${c.chamber.notOnBallot.length ? `, ${c.chamber.notOnBallot.length} not on this ballot` : ""}`;
+  if (isFinal()) {
+    // Every simulation of the final count is the same, so any one of them is the seats won.
+    $("rcv-tiles").replaceChildren(tile("First-choice leaders", line((g) => leaders[g.key]), ofSeats), tile("Seats won", line((g) => perRun[0][g.key]), `${ofSeats}, in the final count`));
+    return;
+  }
   $("rcv-tiles").replaceChildren(
-    tile("First-choice leaders", line((g) => leaders[g.key]), `Republican, Democrat, others: seats of ${c.chamber.seats}${c.chamber.notOnBallot.length ? `, ${c.chamber.notOnBallot.length} not on this ballot` : ""}`),
+    tile("First-choice leaders", line((g) => leaders[g.key]), ofSeats),
     tile("With the rest simulated", line((g) => spread(perRun.map((s) => s[g.key])).median), `median seats in ${fmt(runs)} simulations, not a forecast`),
     tile("Ballots left", `about ${fmt(Math.round(left / 10) * 10)}`, "estimated, across races with more than one candidate"),
   );

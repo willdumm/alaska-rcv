@@ -1,6 +1,6 @@
 // The rounds chart: ribbons of ballots between rounds, one row per candidate.
 import { $, addPlates, fmt, pct, withTip } from "./rcv-dom.js";
-import { INACTIVE_COLOR, WRITE_IN_COLOR, majorityIn } from "./rcv-model.js";
+import { INACTIVE_COLOR, WRITE_IN_COLOR, isFinal, majorityIn } from "./rcv-model.js";
 
 function ribbonPath(x0, x1, y0a, y0b, y1a, y1b) {
   const mid = (x0 + x1) / 2;
@@ -101,7 +101,7 @@ export function renderFlow(c, result, first = null) {
   if (won) {
     const name = c.byLetter[won.letter].short;
     const where = columns.length > 1 ? ` in round ${found.round + 1}` : "";
-    for (const text of wrapped(`Counted so far${found.round ? ", projected" : ""}: ${name} has a majority${where}`)) verdict.push({ text, cls: "strong" });
+    for (const text of wrapped(`${isFinal() ? "Final count" : `Counted so far${found.round ? ", projected" : ""}`}: ${name} has a majority${where}`)) verdict.push({ text, cls: "strong" });
     if (found.round < rounds.length - 1) {
       verdict.push({ cls: "dim", text: found.round === 0
         ? fitted("Alaska's count would have stopped at round 1", "The count would stop at round 1")

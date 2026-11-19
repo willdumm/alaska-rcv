@@ -4,8 +4,9 @@ import { sum } from "./rcv-rows.js";
 // so this expects each district to end up with its 2024 share of early and absentee ballots, takes off
 // what it has counted already, and scales the rest to the statewide total. It leaves out the Division's questioned
 // row, since questionedByDistrict estimates all of those. The page and scripts/simulate_projection.mjs share this
-// file, so their estimates can't drift.
+// file, so their estimates can't drift. Once the Division has counted every ballot (coverage.final), none are left.
 export function uncountedByDistrict(coverage, earlyAbsentee2024) {
+  if (coverage.final) return new Map(Object.keys(coverage.districts).map((key) => [Number(key), 0]));
   const { received, cvrBallotsByGroup } = coverage;
   const ballots = received.received - received.questioned;
   // The summary can run ahead of the CVR, and then these ballots are already among the hand-counted ones.
@@ -40,8 +41,9 @@ export function questionedAheadOfCvr(coverage, questioned2024, statewide, hd) {
 
 // Questioned ballots expected per district. The Division hasn't published a full count, so this takes 2024's,
 // scaled for turnout. Questioned voters often vote outside their own district and then only their statewide races
-// count, so a State House or Senate race has far fewer of them than a statewide one.
+// count, so a State House or Senate race has far fewer of them than a statewide one. A final count has counted them all.
 export function questionedByDistrict(coverage, questioned2024, statewide) {
+  if (coverage.final) return new Map(Object.keys(coverage.districts).map((key) => [Number(key), 0]));
   const { scale } = turnoutSince2024(coverage, questioned2024);
   const counts = statewide ? questioned2024.statewide : questioned2024.house;
   return new Map(Object.keys(coverage.districts).map((key) => [Number(key), (counts[key] || 0) * scale]));

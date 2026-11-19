@@ -66,10 +66,16 @@ nix shell nixpkgs#nodejs nixpkgs#poppler-utils nixpkgs#unzip -c bash
    from its saved headers. It then checks the simulation's arithmetic and the vote totals.
    Same inputs give a byte-identical `projection.json`. Once the CVR includes questioned ballots (group 4), the simulation only
    adds whatever is left of each district's expected count; revisit that then.
+   Once the Division has counted every ballot and run its tabulation, add `--final`: `coverage.json` then says `"final": true`,
+   nothing is left uncounted, and every simulation ends the same way. The page then shows the final count's wording and the
+   simulation history in place of the simulation. The Division's November 18, 2026 count is the final one.
 4. By hand, reread the caveats in `site/content/_index.md`: they may go out of date.
-5. By hand, once the Division publishes round-by-round reports on November 18, compare them and say so on the page.
+5. By hand, compare the Division's round-by-round reports, if it has posted any for this CVR:
+   `node scripts/validate_2024.mjs site/static/data/alaska-rcv-2026 REPORTS/*.txt` (each report through `pdftotext -layout`).
+   docs/RULES.md lists the differences to expect.
 6. `bash scripts/refresh.sh keep site/static/data/alaska-rcv-2026 site/static/data/alaska-rcv-2026` keeps this build as a version, and
-   rewrites `versions.json`. Then `bash scripts/refresh.sh archive RAW_DIR site/static/data/alaska-rcv-2026` adds the raw files' checksums to `../sources.sha256`, since the Division overwrites
+   rewrites `versions.json` and `history.json`, each version's simulated wins per contest for the final page's chart
+   (`build_history.mjs`). Then `bash scripts/refresh.sh archive RAW_DIR site/static/data/alaska-rcv-2026` adds the raw files' checksums to `../sources.sha256`, since the Division overwrites
    them, and prints the `gh release create` command. Add a row to `../SOURCES.md` by hand.
 7. Before deploying, `bash scripts/refresh.sh check site/static/data/alaska-rcv-2026 CACERT` runs the tests, the vote total
    checks and the simulation again, and fails unless the Division's latest CVR and received table are the ones in `coverage.json`.

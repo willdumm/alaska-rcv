@@ -6,14 +6,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { manifestEntry, versionId } from "../scripts/build_versions.mjs";
+import { ACROSS_VERSIONS, manifestEntry, versionId } from "../scripts/build_versions.mjs";
 import { oldName } from "../site/static/rcv-versions.js";
 import { readReceived } from "../scripts/received_from_table.mjs";
+import { buildHistory, historyText } from "../scripts/build_history.mjs";
 
 const root = new URL("../site/static/data/alaska-rcv-2026/", import.meta.url);
 const read = (path) => JSON.parse(readFileSync(new URL(path, root)));
 const { versions } = read("versions.json");
-const isData = (name) => name !== "versions" && name !== "versions.json";
+const isData = (name) => !ACROSS_VERSIONS.includes(name);
 const script = fileURLToPath(new URL("../scripts/build_versions.mjs", import.meta.url));
 
 test("the list is every version directory, newest first, with each one's own numbers", () => {
@@ -36,6 +37,12 @@ test("every version has the page's files, simulated from its own CVR", () => {
     assert.equal(read(`versions/${id}/projection.json`).cvrLastModified, read(`versions/${id}/coverage.json`).cvrLastModified, id);
     for (const contest of read(`versions/${id}/ballots.json`).contests) assert.ok(existsSync(new URL(`versions/${id}/contest-${contest.id}.json`, root)), `${id}: contest ${contest.id}`);
   }
+});
+
+test("the simulations' history is every version's projection, and only the newest can be the final count", () => {
+  const data = fileURLToPath(root);
+  assert.equal(readFileSync(new URL("history.json", root), "utf8"), historyText(buildHistory(data)));
+  assert.ok(versions.slice(1).every((v) => !v.final));
 });
 
 test("a version is named for its CVR and its received table, and dated by the Division's latest change, in Alaska time", () => {
@@ -72,17 +79,18 @@ test("keeping a build rebuilds its version, but won't replace one that holds oth
     const built = join(work, "built"), data = join(work, "data");
     mkdirSync(built);
     mkdirSync(join(data, "versions"), { recursive: true });
-    const keep = (c, extra = "") => {
+    const projection = (note) => JSON.stringify({ parameters: { runs: 1 }, contests: {}, note });
+    const keep = (c, extra = projection("built")) => {
       writeFileSync(join(built, "coverage.json"), JSON.stringify(c));
       writeFileSync(join(built, "projection.json"), extra);
       cpSync(join(built, "coverage.json"), join(data, "coverage.json"));
       return execFileSync(process.execPath, [script, built, data], { encoding: "utf8", stdio: "pipe" });
     };
     keep(coverage);
-    assert.match(keep(coverage, "rebuilt"), /Kept version 2026-11-05T002443Z-2026-11-04T203700Z\. 1 versions/);
-    assert.equal(readFileSync(join(data, "versions", versionId(coverage), "projection.json"), "utf8"), "rebuilt");
+    assert.match(keep(coverage, projection("rebuilt")), /Kept version 2026-11-05T002443Z-2026-11-04T203700Z\. 1 versions/);
+    assert.equal(readFileSync(join(data, "versions", versionId(coverage), "projection.json"), "utf8"), projection("rebuilt"));
     assert.throws(() => keep({ ...coverage, report: { stamp: "11/5/2026 12:05:00 AM", votersCast: 2 } }), /already holds other data/);
-    assert.equal(readFileSync(join(data, "versions", versionId(coverage), "projection.json"), "utf8"), "rebuilt");
+    assert.equal(readFileSync(join(data, "versions", versionId(coverage), "projection.json"), "utf8"), projection("rebuilt"));
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

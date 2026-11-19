@@ -5,7 +5,10 @@ import test from "node:test";
 import { questionedAheadOfCvr, questionedByDistrict, uncountedByDistrict } from "../site/static/rcv-uncounted.js";
 
 const data = (name) => JSON.parse(readFileSync(new URL(`../site/static/data/alaska-rcv-2026/${name}`, import.meta.url)));
-const coverage = data("coverage.json");
+// The model is tested on the last count with ballots left: the final count has none.
+const latest = data("coverage.json");
+const { versions } = data("versions.json");
+const coverage = data(`versions/${versions.find((v) => !v.final).id}/coverage.json`);
 const shares = data("early-absentee-2024.json");
 const questioned2024 = data("questioned-2024.json");
 const sum = (map) => [...map.values()].reduce((a, b) => a + b, 0);
@@ -37,4 +40,12 @@ test("early and absentee ballots ahead of the CVR come off the uncounted ballots
   const d = coverage.districts[5];
   const ahead = { ...coverage, districts: { ...coverage.districts, 5: { ...d, summary: { ...d.summary, ab: (d.summary.ab || 0) + 100 } } } };
   assert.ok(Math.abs(sum(uncountedByDistrict(ahead, shares)) - (before - 100)) < 1e-6);
+});
+
+test("the final count has no ballots left, uncounted or questioned", () => {
+  if (!latest.final) return;
+  for (const map of [uncountedByDistrict(latest, shares), questionedByDistrict(latest, questioned2024, true), questionedByDistrict(latest, questioned2024, false)]) {
+    assert.equal(map.size, Object.keys(latest.districts).length);
+    assert.equal(sum(map), 0);
+  }
 });

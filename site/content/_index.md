@@ -1,25 +1,27 @@
 ---
 title: Alaska 2026 General Election
 subtitle: ranked choice results explorer
-description: An unofficial, preliminary look at Alaska's 2026 general election, from the Division of Elections' posted results. Not affiliated with the State of Alaska.
+description: An unofficial look at Alaska's 2026 general election and its ranked choice count, from the Division of Elections' posted results. Not affiliated with the State of Alaska.
 ---
 
 {{< rcv/intro byline="Prepared by Will Dumm &middot; questions to [will@dummthings.dev](mailto:will@dummthings.dev?subject=Alaska%20RCV%20explorer)" repo="https://github.com/willdumm/alaska-rcv" >}}
 
 {{< rcv/notice >}}
-**Preliminary and unofficial.** Counting isn't finished, so anyone leading here may not lead at the end. Not affiliated with the State of Alaska or the Division of Elections. [Read the caveats](#caveats).
+**Final count, unofficial until certified.** The Division of Elections has counted every ballot and run its ranked choice tabulation. It plans to certify the results on November 25. Not affiliated with the State of Alaska or the Division of Elections. [Read the caveats](#caveats).
 {{< /rcv/notice >}}
 
 {{< rcv/prose id="rcv-about" >}}
 
-As part of their preliminary election results, the Division of Elections posts rankings for scanned ballots, but only first choices for hand-counted ballots. The official ranked choice tabulation will be done on November 18 after all ballots are counted. This page estimates election results from what's posted so far.
+The Division of Elections posts the rankings on every ballot it scans. While ballots were still being counted, it had rankings only for scanned ballots and first choices for hand-counted ones, so this page estimated the ranked choice results and simulated the ballots still to come. Counting finished on November 18: the Division scanned every ballot and ran its ranked choice tabulation, and this page's count matches every number in its 15 round-by-round reports.
 
 In ranked choice tabulation, if no candidate has a majority, the last-place candidate is eliminated and those ballots move to their next choice, until two candidates remain. Moving down the page:
 
-- **Results map by house district:** first choices in each district, and about how many ballots are left to count.
-- **Ranked choice tabulation:** who would win if counting stopped now, if hand-counted ballots rank candidates like scanned ballots do.
-- **Simulations:** a better idea of who wins once counting finishes. Each district's uncounted ballots are drawn at random from ballots already counted there, then tabulated. We run this simulation 1,000 times, and count how many simulations each candidate wins.
-- **Ballot rankings:** how scanned ballots ranked their next choices.
+- **Results map by house district:** first choices in each district, or each district's ballots after ranked choice tabulation.
+- **Ranked choice tabulation:** every round of the count, from every ballot's rankings.
+- **How the simulations changed:** while counting went on, this page drew the uncounted ballots at random from those already counted, 1,000 times, and counted how many of those simulations each candidate won. This shows how that moved as results came in.
+- **Ballot rankings:** how voters ranked their next choices.
+
+The version picker shows the page on any earlier update from the Division, with the estimates and simulations it had then.
 
 {{< /rcv/prose >}}
 
@@ -136,6 +138,20 @@ It leaves out ballots yet to arrive, ballots the Division rejects, precincts yet
 
 {{< /rcv/section >}}
 
+{{< rcv/section id="history" title="How the simulations changed as ballots were counted" tag="Simulated" class="rcv-section-sim" >}}
+
+{{< rcv/slot id="rcv-history" class="rcv-chart" >}}
+
+{{< rcv/note id="rcv-history-note" >}}{{< /rcv/note >}}
+
+{{< rcv/details summary="Table of simulations won, by update" >}}
+
+{{< rcv/table id="rcv-history-table" >}}
+
+{{< /rcv/details >}}
+
+{{< /rcv/section >}}
+
 {{< rcv/section id="ranks-section" title="Explore ballot rankings" >}}
 
 Pick a first choice to see how scanned ballots ranked their next choice.
@@ -155,11 +171,11 @@ Pick a first choice to see how scanned ballots ranked their next choice.
 ## Before quoting anything here
 
 - **No guarantee.** This is an independent page, not the Division's. The Division's count is the only official one, and it hasn't checked this page. Please don't contact the Division about it.
-- **Hand-counted ballots have first choices but no rankings.** They're concentrated in rural areas, so later rounds there rest on few ballots and may be wrong.
+- **Earlier versions are estimates.** Before November 18, hand-counted ballots had first choices but no rankings, and ballots were still being counted, so earlier versions' later rounds and simulations are estimates.
 - **Statewide races aren't decided by district.** Early and absentee ballots sit under the districts the Division's reports give them, which can differ from where voters live.
-- **Simulations aren't forecasts.** Different assumptions give different numbers.
+- **Simulations weren't forecasts.** Different assumptions give different numbers.
 
-**How this was checked.** On scanned ballots alone, this page's count reproduces all 9 of the Division's certified 2024 round-by-round reports. It also agrees with [RCTab](https://github.com/BrightSpots/rcv), a separate open source vote-counting program, on every 2024 and 2026 contest, apart from at most 21 votes in a round. Nothing can check the projected rounds until the Division publishes its own. [Rules and checks](https://github.com/willdumm/alaska-rcv/blob/main/docs/RULES.md).
+**How this was checked.** This page's count reproduces every number in all 15 of the Division's 2026 round-by-round reports, and on scanned ballots alone, all 9 of its certified 2024 reports. In Senate District C, the Division's report goes on to a second round after Stutes has a majority in round 1, where the law ends the count. The winner is the same. It also agreed with [RCTab](https://github.com/BrightSpots/rcv), a separate open source vote-counting program, on every 2024 contest and on the 2026 count posted November 4, apart from at most 21 votes in a round, all from repeated rankings. [Rules and checks](https://github.com/willdumm/alaska-rcv/blob/main/docs/RULES.md).
 
 **Sources.** The Division's [list of scanned ballots and their rankings](https://www.elections.alaska.gov/enr/26GENR/results/CVR_Export.zip) (its Cast Vote Record), [results summary](https://www.elections.alaska.gov/enr/26GENR/results/ElectionSummaryReportRPT.pdf), [results page](https://www.elections.alaska.gov/election-results/e/), [district map](https://www.elections.alaska.gov/enr/26GENR/) and [district names](https://www.elections.alaska.gov/doc/forms/H07.pdf); the same list for 2024; the U.S. Census Bureau's [state outline](https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html). Charts by [d3](https://d3js.org).
 

@@ -25,6 +25,18 @@ export async function chooseVersion(wanted) {
   return { versions, earlier, missing: Boolean(wanted && !chosen), dir: earlier ? `${ROOT}versions/${earlier.id}/` : ROOT };
 }
 
+// Every version's simulated wins, for the final count's look back. Without it, the page leaves that chart out.
+export async function loadHistory() {
+  try {
+    const response = await fetch(`${ROOT}history.json`);
+    if (!response.ok) throw new Error(String(response.status));
+    return await response.json();
+  } catch (error) {
+    console.warn(`history.json: ${error.message}`);
+    return null;
+  }
+}
+
 function goTo(id, latest) {
   const q = new URLSearchParams(location.search);
   if (id === latest) q.delete("version");
@@ -33,7 +45,7 @@ function goTo(id, latest) {
   location.assign(`${text ? `?${text}` : location.pathname}${location.hash}`);
 }
 
-const optionLabel = (v, i) => `${alaskaTime(new Date(v.time))}: ${fmt(v.counted)} counted, ${fmt(v.received)} on the received table${i === 0 ? " (latest)" : ""}`;
+const optionLabel = (v, i) => `${alaskaTime(new Date(v.time))}: ${fmt(v.counted)} counted${v.final ? " (final count)" : `, ${fmt(v.received)} on the received table${i === 0 ? " (latest)" : ""}`}`;
 
 export function renderVersions({ versions, earlier, missing }) {
   const note = $("rcv-version-note");
@@ -52,7 +64,7 @@ export function renderVersions({ versions, earlier, missing }) {
 
   const warning = $("rcv-version-warning");
   warning.replaceChildren(strong(`Earlier version: the Division's data as of ${alaskaTime(new Date(earlier.time))}. `),
-    el("button", { type: "button", class: "rcv-reset", onclick: () => goTo(latest, latest) }, "Back to the latest"));
+    el("button", { type: "button", class: "rcv-reset", onclick: () => goTo(latest, latest) }, versions[0].final ? "Back to the final count" : "Back to the latest"));
   warning.hidden = false;
   note.textContent = `This runs today's model on what the Division had posted then, so it isn't what this page showed that day. The simulations run 1,000 times per race, so a close race's wins can move by about 16 of 1,000 between versions by chance alone.${earlier.note ? ` ${earlier.note}` : ""}`;
   note.hidden = false;

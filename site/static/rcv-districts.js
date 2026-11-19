@@ -1,6 +1,6 @@
 // The district views: the list of districts, the coverage table, and the map.
 import { $, addPlates, el, fmt, pct, strong, withTip } from "./rcv-dom.js";
-import { MIDDLE, MARGIN_BREAKS, ballotsLeft, ballotsLeftInContest, coverage, districtBallots, districtName, districts, isStatewide, lowCoverage, placesOf, roundTen, districtLines } from "./rcv-model.js";
+import { MIDDLE, MARGIN_BREAKS, ballotsLeft, ballotsLeftInContest, coverage, districtBallots, districtName, districts, isFinal, isStatewide, lowCoverage, placesOf, roundTen, districtLines } from "./rcv-model.js";
 import { senateSeatOf } from "./rcv-chambers.js";
 import { actions, currentContest as current, state } from "./rcv-state.js";
 
@@ -33,11 +33,11 @@ export function renderMapMode(c) {
   const box = $("rcv-map-mode");
   box.hidden = c.letters.length < 3;
   if (box.hidden) state.mapMode = "first";
-  $("districts").querySelector(".rcv-tag").textContent = state.mapMode !== "first" ? "Projected from the Division's results" : c.measure ? "Division's results" : "From the Division's results";
+  $("districts").querySelector(".rcv-tag").textContent = state.mapMode !== "first" && !isFinal() ? "Projected from the Division's results" : c.measure ? "Division's results" : "From the Division's results";
   if (box.hidden) return;
   const option = (value, text) => el("label", {}, el("input", { type: "radio", name: "rcv-map-mode", value, checked: state.mapMode === value,
     onchange: () => { state.mapMode = value; actions.render(); } }), ` ${text}`);
-  box.replaceChildren(option("first", "First choices"), option("final", "After ranked choice tabulation, projected"));
+  box.replaceChildren(option("first", "First choices"), option("final", isFinal() ? "After ranked choice tabulation" : "After ranked choice tabulation, projected"));
 }
 
 // One line per group in a ranking chart, on a background that hides the axis lines and anything else drawn behind its text.
@@ -53,8 +53,10 @@ export function drawGroupHeadings(svg, groups, { y, rowHeight, colorOf, textOf }
 export function renderDots(c, shares) {
   const box = $("rcv-dots");
   box.replaceChildren();
-  $("rcv-dots-note").hidden = !shares;
-  $("rcv-dots-final-note").hidden = !shares || c.letters.length < 3;
+  // The final count has no ballots left, and every ballot's rankings known, so neither note applies.
+  const final = isFinal();
+  $("rcv-dots-note").hidden = !shares || final;
+  $("rcv-dots-final-note").hidden = !shares || c.letters.length < 3 || final;
   if (!shares) { box.append(el("p", { class: "muted" }, "This contest has one candidate, so there's no comparison to plot.")); return; }
   const rows = [...shares.shares.values()].filter((d) => d.hd !== 99 && d.total >= MIN_ROW_BALLOTS);
   const missing = [...new Set([...c.districts, ...Object.keys(coverage.districts).map(Number)])]
@@ -62,8 +64,8 @@ export function renderDots(c, shares) {
 
   const width = Math.max(box.clientWidth, 280);
   const rowHeight = 23;
-  const leftWidth = 58;
-  const margin = { top: 44, left: 76, right: leftWidth + 14, bottom: 8 };
+  const leftWidth = final ? 0 : 58;
+  const margin = { top: 44, left: 76, right: final ? 14 : leftWidth + 14, bottom: 8 };
   // Statewide, then each leader's districts together, highest share first.
   const wholeName = isStatewide(c) ? "Statewide" : "All";
   const groups = c.order.map((leader) => ({ leader, members: rows.filter((d) => d.leader === leader).sort((p, q) => q.share - p.share) })).filter((g) => g.members.length);
@@ -86,8 +88,10 @@ export function renderDots(c, shares) {
   axis.selectAll("text").data(ticks).join("text").attr("x", x).attr("y", margin.top - 13).attr("text-anchor", "middle").attr("class", "dim")
     .text((d) => `${Math.round(d * 100)}%`);
 
-  svg.append("text").attr("x", width - 4).attr("y", 13).attr("text-anchor", "end").attr("class", "dim").text("Ballots");
-  svg.append("text").attr("x", width - 4).attr("y", margin.top - 13).attr("text-anchor", "end").attr("class", "dim").text("left");
+  if (!final) {
+    svg.append("text").attr("x", width - 4).attr("y", 13).attr("text-anchor", "end").attr("class", "dim").text("Ballots");
+    svg.append("text").attr("x", width - 4).attr("y", margin.top - 13).attr("text-anchor", "end").attr("class", "dim").text("left");
+  }
   const leftOf = (d) => {
     if (d.hd !== "all") return ballotsLeft(c, d.hd);
     return ballotsLeftInContest(c);
@@ -102,7 +106,7 @@ export function renderDots(c, shares) {
   const row = svg.append("g").selectAll("g").data(allRows).join("g")
     .attr("class", (d) => `row${d.hd === state.hd ? " selected" : ""}`)
     .attr("transform", (d) => `translate(0,${y(lines.indexOf(d))})`)
-    .attr("aria-label", (d) => `${d.hd === "all" ? "All districts" : districtName(d.hd)}, ${c.byLetter[d.leader].short} leads with ${pct(d.share, 1)}, about ${roundLeft(leftOf(d).total)} ballots left`);
+    .attr("aria-label", (d) => `${d.hd === "all" ? "All districts" : districtName(d.hd)}, ${c.byLetter[d.leader].short} ${final ? "has" : "leads with"} ${pct(d.share, 1)}${final ? "" : `, about ${roundLeft(leftOf(d).total)} ballots left`}`);
   row.append("rect").attr("class", "hit").attr("width", width).attr("height", rowHeight).attr("fill", "transparent").attr("rx", 3);
   row.append("text").attr("x", 4).attr("y", rowHeight / 2 + 4)
     .attr("class", (d) => (d.hd === "all" || d.hd === state.hd ? "strong" : ""))
@@ -111,37 +115,38 @@ export function renderDots(c, shares) {
     .attr("fill", (d) => (isHollow(d, shares) ? "#fff" : c.color[d.leader]))
     .attr("stroke", (d) => (isHollow(d, shares) ? c.color[d.leader] : "#fff"))
     .attr("stroke-width", 2);
-  row.filter((d) => d.hd !== "all").append("rect").attr("class", "left-bar").attr("x", (d) => width - leftScale(ballotsLeft(c, d.hd).total)).attr("y", 3).attr("height", rowHeight - 6).attr("rx", 2)
+  if (!final) row.filter((d) => d.hd !== "all").append("rect").attr("class", "left-bar").attr("x", (d) => width - leftScale(ballotsLeft(c, d.hd).total)).attr("y", 3).attr("height", rowHeight - 6).attr("rx", 2)
     .attr("width", (d) => leftScale(ballotsLeft(c, d.hd).total));
-  row.append("text").attr("x", width - 4).attr("y", rowHeight / 2 + 4).attr("text-anchor", "end").attr("class", (d) => (d.hd === "all" ? "strong" : ""))
+  if (!final) row.append("text").attr("x", width - 4).attr("y", rowHeight / 2 + 4).attr("text-anchor", "end").attr("class", (d) => (d.hd === "all" ? "strong" : ""))
     .text((d) => roundLeft(leftOf(d).total));
   row.call(withTip, (d) => [`${pct(d.share, 1)} ${c.byLetter[d.leader].short}`,
     d.hd === "all" ? (isStatewide(c) ? "Statewide" : "All districts") : `${districtName(d.hd)}: ${placesOf(d.hd)}`,
     `${fmt(d.votes[d.leader])} ${c.byLetter[d.leader].short}, ${fmt(d.votes[d.next])} ${c.byLetter[d.next].short}`,
-    `About ${roundLeft(leftOf(d).total)} ballots left: an estimated ${roundLeft(leftOf(d).uncounted)} early and absentee not yet counted, and an estimated ${roundLeft(leftOf(d).questioned)} questioned`,
+    ...(final ? [] : [`About ${roundLeft(leftOf(d).total)} ballots left: an estimated ${roundLeft(leftOf(d).uncounted)} early and absentee not yet counted, and an estimated ${roundLeft(leftOf(d).questioned)} questioned`]),
     ...(isHollow(d, shares) ? [`Rankings known for ${pct(districtBallots(d.hd).cvr, districtBallots(d.hd).summary, 0)} of this district's counted ballots`] : [])],
     { over: (d) => highlightDistricts(d.hd === "all" ? [] : [d.hd]), out: () => highlightDistricts([]), act: (d) => selectDistrict(d.hd) });
 
-  svg.append("g").selectAll("rect").data(groups).join("rect").attr("class", "left-bar")
+  if (!final) svg.append("g").selectAll("rect").data(groups).join("rect").attr("class", "left-bar")
     .attr("x", (g) => width - leftScale(leaderLeft(g))).attr("y", (g) => y(lines.indexOf(g)) + 5).attr("height", rowHeight - 6).attr("rx", 2)
     .attr("width", (g) => leftScale(leaderLeft(g)));
   const heading = drawGroupHeadings(svg, groups, { y: (g) => y(lines.indexOf(g)), rowHeight, colorOf: (g) => c.color[g.leader], textOf: (g) => `${c.byLetter[g.leader].short} leads` });
-  heading.append("text").attr("x", width - 4).attr("y", rowHeight / 2 + 6).attr("text-anchor", "end").attr("class", "strong").text((g) => roundLeft(leaderLeft(g)));
+  if (!final) heading.append("text").attr("x", width - 4).attr("y", rowHeight / 2 + 6).attr("text-anchor", "end").attr("class", "strong").text((g) => roundLeft(leaderLeft(g)));
 
   svg.append("g").selectAll("text").data(missing).join("text")
     .attr("x", 4).attr("y", (d, i) => y(lines.length + i) + rowHeight / 2 + 4).attr("class", "dim")
     .text((d) => `${districtName(d)}: no votes here yet`);
-  svg.append("g").selectAll("text").data(missing).join("text")
+  if (!final) svg.append("g").selectAll("text").data(missing).join("text")
     .attr("x", width - 4).attr("y", (d, i) => y(lines.length + i) + rowHeight / 2 + 4).attr("text-anchor", "end")
     .text((d) => roundLeft(ballotsLeft(c, d).total));
 }
 
 export function renderCoverage(c, shares) {
   const rows = Object.keys(coverage.districts).map(Number).filter((hd) => hd > 0).sort((p, q) => p - q);
-  $("rcv-coverage-caption").textContent = `Preliminary. ${c.measure ? "Leader is yes or no, as a share of yes and no votes."
-    : !shares ? "No leader: this contest has one candidate." : shares.mode === "final" ? "Leader is the finalist ahead, as a share of the two finalists after the projected ranked choice tabulation." : "Leader is the candidate with the most first choices, as a share of all first choices, write-in or blank included."} Counted is every ballot in the district, in the Division's results. Rankings are known only for scanned ones.`;
+  const final = isFinal();
+  $("rcv-coverage-caption").textContent = `${final ? "Final count, unofficial until certified." : "Preliminary."} ${c.measure ? "Leader is yes or no, as a share of yes and no votes."
+    : !shares ? "No leader: this contest has one candidate." : shares.mode === "final" ? `Leader is the finalist ahead, as a share of the two finalists after the${final ? "" : " projected"} ranked choice tabulation.` : "Leader is the candidate with the most first choices, as a share of all first choices, write-in or blank included."} Counted is every ballot in the district, in the Division's results.${final ? "" : " Rankings are known only for scanned ones."}`;
   $("rcv-coverage").replaceChildren(
-    el("thead", {}, el("tr", {}, ...["District", "Counted", "Scanned", "Rankings known", ...(shares ? ["Leader"] : []), "Ballots left"].map((t) => el("th", { scope: "col" }, t)))),
+    el("thead", {}, el("tr", {}, ...["District", "Counted", "Scanned", "Rankings known", ...(shares ? ["Leader"] : []), ...(final ? [] : ["Ballots left"])].map((t) => el("th", { scope: "col" }, t)))),
     el("tbody", {}, ...rows.map((hd) => {
       const { summary, cvr } = districtBallots(hd);
       const row = shares?.shares.get(hd);
@@ -150,7 +155,7 @@ export function renderCoverage(c, shares) {
         el("th", { scope: "row" }, hd === 99 ? name : el("button", { type: "button", class: "link", onclick: () => selectDistrict(hd), title: placesOf(hd) }, name)),
         el("td", {}, fmt(summary)), el("td", {}, fmt(cvr)), el("td", {}, pct(cvr, summary, 0)),
         ...(shares ? [el("td", {}, row?.share != null ? `${c.byLetter[row.leader].short} ${pct(row.share, 1)}` : "–")] : []),
-        el("td", {}, fmt(roundTen(ballotsLeft(c, hd).total))));
+        ...(final ? [] : [el("td", {}, fmt(roundTen(ballotsLeft(c, hd).total)))]));
     })),
   );
 }
@@ -358,7 +363,7 @@ function mapTipText(hd) {
   if (!d) return "No votes here yet";
   if (!d.total) return "No votes here yet";
   if (lastShares.mode === "first") return [d.leader, d.next].map((l) => `${c.byLetter[l].short} ${pct(d.votes[l], d.total)}`).join(", ");
-  return `${pct(d.share, 1)} ${c.byLetter[d.leader].short} of the two finalists, projected`;
+  return `${pct(d.share, 1)} ${c.byLetter[d.leader].short} of the two finalists${isFinal() ? "" : ", projected"}`;
 }
 
 

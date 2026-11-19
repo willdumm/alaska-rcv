@@ -5,19 +5,21 @@ import { tabulate } from "./rcv-tabulate.js";
 import { ballotCounts } from "./rcv-rows.js";
 import { measureContest, measuresIn } from "./rcv-measures.js";
 import { $, alaskaTime, el, fmt, pct, strong, watchPointers } from "./rcv-dom.js";
-import { INACTIVE_COLOR, LOW_RANKINGS, WRITE_IN_COLOR, ballotsLeft, ballotsLeftInContest, countedBallots, coverage, districtName, districtShares, districts, firstChoices, index, knownRankings, majorityIn, ofRuns, parseStamp, placesOf, prepareContest, projection, readRanking, roundTen, setData, summaryFor, writeInsMatter } from "./rcv-model.js";
+import { INACTIVE_COLOR, LOW_RANKINGS, WRITE_IN_COLOR, ballotsLeft, ballotsLeftInContest, countedBallots, coverage, districtName, districtShares, districts, firstChoices, index, isFinal, knownRankings, majorityIn, ofRuns, parseStamp, placesOf, prepareContest, projection, readRanking, roundTen, setData, summaryFor, writeInsMatter } from "./rcv-model.js";
 import { renderFlow, roundStory } from "./rcv-flow.js";
 import { renderProjection } from "./rcv-projection.js";
+import { renderHistory } from "./rcv-history.js";
 import { drawMap, paintMap, renderCoverage, renderDots, renderMapLegend, renderMapMode, setLastShares, windAllRings } from "./rcv-districts.js";
 import { actions, currentContest, state } from "./rcv-state.js";
 import { chamberContest, chamberLabel, isChamber, renderChamber } from "./rcv-seats.js";
-import { chooseVersion, renderVersions, watchForNewer } from "./rcv-versions.js";
+import { chooseVersion, loadHistory, renderVersions, watchForNewer } from "./rcv-versions.js";
 
 let dataDir;
 let earlierVersion = null;
 const contests = new Map();
 let updatedText;
 let measures;
+let simHistory = null;
 
 // Data
 
@@ -42,7 +44,9 @@ function renderStatus() {
   const stamp = parseStamp(report.stamp);
   updatedText = stamp?.short ?? report.stamp;
   $("rcv-updated").textContent = stamp?.long ?? report.stamp;
-  $("rcv-updated-detail").textContent = `The Division's results, with ${report.precinctsReported} of ${report.precinctsTotal} precincts and ${fmt(report.votersCast)} ballots. Scanned ballots posted ${alaskaTime(new Date(cvrLastModified))}. Ballots received as of ${received.asOf}. Last checked ${alaskaTime(new Date(fetched))}.`;
+  $("rcv-updated-detail").textContent = isFinal()
+    ? `The Division's final count, unofficial until it's certified: all ${report.precinctsTotal} precincts and ${fmt(report.votersCast)} ballots, every one scanned. Ballots posted ${alaskaTime(new Date(cvrLastModified))}.`
+    : `The Division's results, with ${report.precinctsReported} of ${report.precinctsTotal} precincts and ${fmt(report.votersCast)} ballots. Scanned ballots posted ${alaskaTime(new Date(cvrLastModified))}. Ballots received as of ${received.asOf}. Last checked ${alaskaTime(new Date(fetched))}.`;
 }
 
 
@@ -71,7 +75,12 @@ function renderSummary(c, result) {
     const final = stopped.rounds[stopped.rounds.length - 1];
     const when = stopped.rounds.length === 1 ? "in round 1" : "after tabulation";
     const value = stopped.leader ? `${c.byLetter[stopped.leader].short} ${whole ? "wins" : "leads"} ${when} with ${pct(final.votes[stopped.leader], final.active)}` : `Tied ${when}`;
-    tiles.push(tile("Current result", value, "if counting stopped now.", { href: "#rcv-flow", text: "see the ranked choice tabulation" }));
+    tiles.push(isFinal() ? tile("Result", value, "in the final count.", { href: "#rcv-flow", text: "see the ranked choice tabulation" })
+      : tile("Current result", value, "if counting stopped now.", { href: "#rcv-flow", text: "see the ranked choice tabulation" }));
+  }
+  if (isFinal()) {
+    $("rcv-tiles").replaceChildren(...tiles);
+    return;
   }
   const sim = projection.contests[c.id];
   if (sim) {
@@ -107,15 +116,16 @@ function renderCount(c, hd) {
 // being reassigned, so the text only says why.
 function renderCountText(c, result) {
   const ranked = c.letters.length > 2;
-  const notHere = "The simulations in the next section account for ballots not yet counted, so their winning candidates may not match current tabulation results here.";
+  const notHere = isFinal() ? "" : " The simulations in the next section account for ballots not yet counted, so their winning candidates may not match current tabulation results here.";
+  const later = isFinal() ? " Every ballot was scanned, so every round is counted from the ballots themselves." : " Later rounds are an estimate from scanned ballots with the same first choice.";
   const reassigned = result.first ? "Ballots with a write-in or blank first choice are reassigned to the candidate they rank highest (AS 15.15.350(d)). " : "";
-  const intro = c.measure ? `The Division's results. ${notHere}`
+  const intro = c.measure ? `The Division's results.${notHere}`
     : c.letters.length === 1 ? `${reassigned}This contest has one candidate, so round 1 decides it.`
-    : !ranked ? `${reassigned}With two candidates, the one with more votes wins. ${notHere}`
-    : `${reassigned}If a candidate ${result.first ? "then " : ""}has over half the votes, they win in round 1. Otherwise the candidate with the fewest votes is eliminated, one round at a time, until two remain. Later rounds are an estimate from scanned ballots with the same first choice. ${notHere}`;
+    : !ranked ? `${reassigned}With two candidates, the one with more votes wins.${notHere}`
+    : `${reassigned}If a candidate ${result.first ? "then " : ""}has over half the votes, they win in round 1. Otherwise the candidate with the fewest votes is eliminated, one round at a time, until two remain.${later}${notHere}`;
   $("rcv-count-intro").replaceChildren(el("p", {}, intro));
-  $("count-title").textContent = ranked ? "Ranked choice tabulation, for ballots counted so far" : "The count so far";
-  document.querySelector("#count .rcv-tag").textContent = ranked ? "Projected from the Division's results" : c.measure ? "Division's results" : "From the Division's results";
+  $("count-title").textContent = isFinal() ? (ranked ? "Ranked choice tabulation" : "The count") : ranked ? "Ranked choice tabulation, for ballots counted so far" : "The count so far";
+  document.querySelector("#count .rcv-tag").textContent = ranked && !isFinal() ? "Projected from the Division's results" : c.measure ? "Division's results" : "From the Division's results";
   $("rcv-projection-intro").replaceChildren(...(c.letters.length === 1 ? [] : [el("p", {}, "Here we simulate how the remaining ballots could look, based on the counts of ballots expected and the candidate shares of votes already counted in each district. The table below shows how many times each possible election outcome was observed in 1000 simulated elections. These should not be interpreted as candidates' probabilities of winning.")]));
 }
 
@@ -350,12 +360,12 @@ function renderDistrictWarning() {
   const warning = $("rcv-district-warning");
   warning.hidden = !narrowed;
   if (!narrowed) { warning.replaceChildren(); return; }
-  warning.replaceChildren(strong(`Only ${districtName(state.hd)}. `), el("span", { class: "rcv-warning-detail" }, "Everything but the simulations shows this one district, not the whole contest. "),
+  warning.replaceChildren(strong(`Only ${districtName(state.hd)}. `), el("span", { class: "rcv-warning-detail" }, isFinal() ? "Everything but the simulation history shows this one district, not the whole contest. " : "Everything but the simulations shows this one district, not the whole contest. "),
     el("button", { type: "button", class: "rcv-reset", onclick: () => selectDistrict(state.hd) }, "Reset to all districts"));
 }
 
 function scopeText(c) {
-  return `${earlierVersion ? "Earlier version. " : ""}${c.name}, ${state.hd === "all" ? "all districts" : districtName(state.hd)}. Preliminary and unofficial, results as of ${updatedText}.`;
+  return `${earlierVersion ? "Earlier version. " : ""}${c.name}, ${state.hd === "all" ? "all districts" : districtName(state.hd)}. ${isFinal() ? "Final count, unofficial until certified" : "Preliminary and unofficial, results"} as of ${updatedText}.`;
 }
 
 // Says so on the page, rather than leaving a half-drawn page that could be read as results.
@@ -378,6 +388,10 @@ async function draw() {
   if (token !== renderToken) return;
   currentContest.value = c;
   $("count").hidden = whole;
+  // The final count has nothing left to simulate, so it looks back at the simulations instead, for one contest at a time.
+  $("projection").hidden = isFinal();
+  $("history").hidden = !isFinal() || whole;
+  $("rcv-cvr-rounds").closest("details").hidden = isFinal();
   $("f-hd").closest("label").hidden = whole;
   $("rcv-coverage").closest("details").hidden = whole;
   if (state.hd !== "all" && !c.districts.includes(state.hd)) state.hd = "all";
@@ -397,7 +411,8 @@ async function draw() {
   }
 
   renderSummary(c, renderCount(c, state.hd));
-  renderProjection(c);
+  if (isFinal()) renderHistory(c, simHistory);
+  else renderProjection(c);
   $("ranks-section").hidden = Boolean(c.measure);
   if (!c.measure) renderDrill(c, ballotCounts(c, state.hd));
   renderMapMode(c);
@@ -443,6 +458,7 @@ async function main() {
     const [ballotsFile, coverageFile, districtsFile, namesFile, earlyAbsentee, questioned, projectionFile] = await Promise.all([json("ballots.json"), json("coverage.json"), json("districts.geojson"), json("district-names.json"), json("early-absentee-2024.json"), json("questioned-2024.json"), json("projection.json")]);
     setData({ index: ballotsFile, coverage: coverageFile, districts: districtsFile, districtNames: namesFile, earlyAbsentee2024: earlyAbsentee, questioned2024: questioned, projection: projectionFile });
     measures = measuresIn(index);
+    if (isFinal()) simHistory = await loadHistory();
   } catch (error) {
     $("rcv-updated").textContent = "Couldn't load the data";
     $("rcv-updated-detail").textContent = `The election data didn't load (${error.message}). Please try reloading.`;

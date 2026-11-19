@@ -25,6 +25,9 @@ const base = `http://127.0.0.1:${server.address().port}/`;
 
 const index = JSON.parse(readFileSync(join(root, "data/alaska-rcv-2026/ballots.json"), "utf8"));
 const projection = JSON.parse(readFileSync(join(root, "data/alaska-rcv-2026/projection.json"), "utf8"));
+// Once the Division has counted every ballot, the latest version shows the simulations' history in place of the simulation.
+const final = Boolean(JSON.parse(readFileSync(join(root, "data/alaska-rcv-2026/coverage.json"), "utf8")).final);
+const status = final ? /final count, unofficial/i : /preliminary and unofficial/i;
 const ids = [...index.contests.map((c) => c.id), ...Object.values(index.measureIds)];
 const WIDTHS = [["phone", { width: 390, height: 844 }], ["desktop", { width: 1280, height: 900 }]];
 const problems = [];
@@ -58,6 +61,9 @@ for (const [name, viewport] of WIDTHS) {
         firstChart: document.getElementById("rcv-map").getBoundingClientRect().top < document.getElementById("rcv-flow").getBoundingClientRect().top,
         callouts: document.querySelectorAll("#rcv-callouts .rcv-callout").length,
         dotReach: Math.max(0, ...[...document.querySelectorAll("#rcv-projection svg circle")].map((dot) => Math.abs(dot.getAttribute("cy")))),
+        simulation: document.getElementById("projection").offsetParent !== null,
+        history: document.getElementById("history").offsetParent !== null && Boolean(document.querySelector("#rcv-history svg")),
+        historyPast: [...document.querySelectorAll("#rcv-history svg text")].some((t) => t.getBoundingClientRect().right > document.getElementById("rcv-history").getBoundingClientRect().right + 1),
         text: document.querySelector("main").innerText,
       };
     });
@@ -73,7 +79,10 @@ for (const [name, viewport] of WIDTHS) {
     if (seen.callouts > 1) fail(`${seen.callouts} warnings above the rounds`);
     if (seen.dotReach > 96) fail(`dots stack ${seen.dotReach}px from their line`);
     if (/Loading|Couldn't/.test(seen.updated)) fail(`status says "${seen.updated}"`);
-    if (!/preliminary/i.test(seen.text) || !/unofficial/i.test(seen.text)) fail("doesn't say preliminary and unofficial");
+    if (!status.test(seen.text)) fail(`doesn't say ${status.source}`);
+    if (seen.simulation === final) fail(final ? "shows the simulation after the final count" : "no simulation");
+    if (seen.history !== (final && !seen.oneCandidate)) fail(seen.history ? "shows the simulations' history before the final count" : "no history of the simulations");
+    if (seen.historyPast) fail("the simulations' history has a label past its edge");
     await page.close();
   }
   await context.close();
@@ -101,6 +110,7 @@ for (const [i, version] of versions.entries()) {
       note: document.getElementById("rcv-version-note").textContent,
       detail: document.getElementById("rcv-updated-detail").textContent,
       overflow: document.documentElement.scrollWidth - innerWidth,
+      simulation: document.getElementById("projection").offsetParent !== null,
     }));
     const fail = (what) => problems.push(`version ${version.id} contest ${contest}: ${what}`);
     if (errors.length) fail(`errors: ${errors.join("; ")}`);
@@ -111,6 +121,7 @@ for (const [i, version] of versions.entries()) {
     if (i === 0 && seen.note) fail(`the latest has a note: ${seen.note}`);
     if (!seen.detail.includes(report.votersCast.toLocaleString("en-US"))) fail("the status isn't this version's");
     if (seen.overflow > 0) fail(`page scrolls sideways by ${seen.overflow}px`);
+    if (seen.simulation === Boolean(version.final)) fail(version.final ? "shows the simulation after the final count" : "no simulation");
     await page.close();
   }
 }
@@ -145,7 +156,8 @@ for (const [what, pattern] of BROKEN) {
   await page.close();
   await context.unroute(pattern);
 }
-// A whole chamber: no rounds chart, every district painted, and seats that add up in every simulation.
+// A whole chamber: no rounds chart, every district painted, and seats that add up in every simulation. The final count has
+// no simulation to list.
 for (const chamber of ["senate", "house"]) {
   const { page, errors } = await opened(context, `${base}?contest=${chamber}`);
   const seen = await page.evaluate(() => ({
@@ -162,10 +174,10 @@ for (const chamber of ["senate", "house"]) {
   if (seen.painted < 3) problems.push(`${chamber}: the map isn't painted`);
   const contested = projection.chambers[chamber].races.filter((race) => race.candidates.length > 1).length;
   if (seen.rows !== contested) problems.push(`${chamber}: ${seen.rows} rows in the seat list, not ${contested}`);
-  if (seen.outcomes < 1 || seen.outcomes > 5) problems.push(`${chamber}: ${seen.outcomes} seat splits listed`);
+  if (!final && (seen.outcomes < 1 || seen.outcomes > 5)) problems.push(`${chamber}: ${seen.outcomes} seat splits listed`);
   if (seen.labels.length) problems.push(`${chamber}: map labels ${seen.labels.join()}, which are turned off`);
-  if (seen.table !== 3) problems.push(`${chamber}: ${seen.table} rows in the seats table`);
-  if (!/preliminary/i.test(seen.text) || !/unofficial/i.test(seen.text)) problems.push(`${chamber}: doesn't say preliminary and unofficial`);
+  if (!final && seen.table !== 3) problems.push(`${chamber}: ${seen.table} rows in the seats table`);
+  if (!status.test(seen.text)) problems.push(`${chamber}: doesn't say ${status.source}`);
   await page.check('input[name="rcv-map-mode"][value="final"]');
   await page.waitForFunction((n) => document.querySelectorAll(".rcv-seat-dots .row").length === n, contested);
   {
@@ -194,7 +206,8 @@ for (const chamber of ["senate", "house"]) {
   if (fills.some((fill) => /^(#ece9e4|#ffffff|white)$/i.test(fill))) problems.push("a district with votes has no leader's color");
   await page.close();
 }
-// Each leader's line has its total of ballots left: a bar that stays on the chart, behind the background of the line's text.
+// Each leader's line has its total of ballots left: a bar that stays on the chart, behind the background of the line's text. The
+// final count has no ballots left, and no bars.
 {
   const { page } = await opened(context, base);
   const lines = await page.evaluate(() => {
@@ -204,7 +217,7 @@ for (const chamber of ["senate", "house"]) {
     const inOrder = bars.every((bar, i) => bar.compareDocumentPosition(backgrounds[i]) & Node.DOCUMENT_POSITION_FOLLOWING);
     return { bars: bars.length, backgrounds: backgrounds.length, inOrder, onChart: bars.every((bar) => Number(bar.getAttribute("x")) >= 0) };
   });
-  if (!lines.bars || lines.bars !== lines.backgrounds) problems.push(`${lines.bars} ballots-left bars for ${lines.backgrounds} leaders' lines`);
+  if (final ? lines.bars : !lines.bars || lines.bars !== lines.backgrounds) problems.push(`${lines.bars} ballots-left bars for ${lines.backgrounds} leaders' lines`);
   if (!lines.inOrder) problems.push("a leader's ballots-left bar is drawn over its text's background");
   if (!lines.onChart) problems.push("a leader's ballots-left bar runs off the chart");
   await page.close();
@@ -212,7 +225,7 @@ for (const chamber of ["senate", "house"]) {
 // The summary's links go to their charts, below the sticky filters. The tabulation's link needs a race with later rounds, and
 // since November 14 the default race, U.S. Senate, has a first-round majority, so this uses U.S. Representative.
 const representative = index.contests.find((c) => c.name === "U.S. Representative").id;
-for (const [text, target] of [["see the ranked choice tabulation", "#rcv-flow"], ["see the simulation", "#projection"]]) {
+for (const [text, target] of [["see the ranked choice tabulation", "#rcv-flow"], ...(final ? [] : [["see the simulation", "#projection"]])]) {
   const { page } = await opened(context, `${base}?contest=${representative}`);
   await page.getByRole("link", { name: text }).click();
   await page.waitForFunction(() => scrollY > 0);
@@ -225,20 +238,20 @@ for (const [text, target] of [["see the ranked choice tabulation", "#rcv-flow"],
 {
   const house = index.contests.find((c) => c.name === "House District 6").id;
   const { page } = await opened(context, `${base}?contest=${house}`);
-  const seen = await page.evaluate(() => ({
+  const seen = await page.evaluate((resultTitle) => ({
     intro: document.getElementById("rcv-count-intro").textContent,
     tag: document.querySelector("#count .rcv-tag").textContent,
     rounds: document.getElementById("rcv-rounds").textContent,
     tile: document.getElementById("rcv-tiles").textContent,
-    result: [...document.querySelectorAll("#rcv-tiles > div")].find((d) => d.querySelector("dt").textContent === "Current result")?.textContent ?? "",
+    result: [...document.querySelectorAll("#rcv-tiles > div")].find((d) => d.querySelector("dt").textContent === resultTitle)?.textContent ?? "",
     drill: [...document.querySelectorAll("#rcv-drill button")].map((b) => b.textContent),
-  }));
+  }), final ? "Result" : "Current result");
   if (!/^Ballots with a write-in or blank first choice are reassigned/.test(seen.intro)) problems.push(`House District 6's count says "${seen.intro}"`);
   if (seen.tag !== "From the Division's results") problems.push(`House District 6's count is tagged "${seen.tag}"`);
   if (!/^CandidateFirst choicesRound 1/.test(seen.rounds)) problems.push(`House District 6's table starts "${seen.rounds.slice(0, 40)}"`);
   if (!seen.rounds.includes("majority")) problems.push("House District 6's table doesn't mark round 1's majority");
   if (!/^First choices\S+ 5\d(\.\d+)?%.*write-in or blank \d/.test(seen.tile)) problems.push(`House District 6's first card says "${seen.tile.slice(0, 80)}"`);
-  if (!/^Current result\S+ wins in round 1 with 5\d/.test(seen.result)) problems.push(`House District 6's current result says "${seen.result}"`);
+  if (!/^(Current result|Result)\S+ wins in round 1 with 5\d/.test(seen.result)) problems.push(`House District 6's current result says "${seen.result}"`);
   if (!seen.drill.some((t) => t.startsWith("Write-in or blank"))) problems.push("House District 6's ballot rankings have no Write-in or blank button");
   await page.close();
 }
@@ -287,8 +300,8 @@ for (const [text, target] of [["see the ranked choice tabulation", "#rcv-flow"],
   const fills = () => page.evaluate(() => [...document.querySelectorAll("#rcv-map path.district")].map((p) => p.getAttribute("fill")).join());
   const first = await fills();
   await page.check('input[name="rcv-map-mode"][value="final"]');
-  await page.waitForFunction(() => document.querySelector("#districts .rcv-tag").textContent.startsWith("Projected"));
-  if (first === await fills()) problems.push("the map's tabulation view looks the same as first choices");
+  await page.waitForFunction((before) => [...document.querySelectorAll("#rcv-map path.district")].map((p) => p.getAttribute("fill")).join() !== before, first, { timeout: 5000 })
+    .catch(() => problems.push("the map's tabulation view looks the same as first choices"));
   if (errors.length) problems.push(`the map's tabulation view: ${errors.join("; ")}`);
   await page.close();
 }

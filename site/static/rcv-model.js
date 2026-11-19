@@ -17,6 +17,9 @@ export function setData(data) {
 // A count of simulations, as the page always writes one.
 export const ofRuns = (count) => `${fmt(count)} of ${fmt(projection.parameters.runs)}`;
 
+// The Division has counted every ballot, so there's nothing left to estimate or simulate (refresh.sh build --final).
+export const isFinal = () => Boolean(coverage.final);
+
 export const MIDDLE = "#ece9e4";
 export const MARGIN_BREAKS = [2.5, 10, 25];
 export const LOW_COVERAGE = 0.9;
