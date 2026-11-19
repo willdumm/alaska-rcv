@@ -18,7 +18,7 @@ ballots still to be counted with copies of real ballots, runs the real tabulator
 
 | File | Role |
 |---|---|
-| `simulate_projection.mjs` | The simulation. Writes `site/static/data/alaska-rcv-2026/projection.json` |
+| `simulate_projection.mjs` | The simulation. Writes `site/static/data/alaska-rcv-2026/projection.json`, and `shares.json` with `--shares` |
 | `lib.mjs` | The random numbers and the sampler's binomial, shared with the other scripts |
 | `site/static/rcv-tabulate.js` | The tabulator, shared with the page and checked against 2024 by `validate_2024.mjs` |
 | `site/static/rcv-uncounted.js` | Uncounted and questioned estimates and the turnout ratio, shared with the page so they can't drift |
@@ -33,7 +33,8 @@ ballots still to be counted with copies of real ballots, runs the real tabulator
 
 ```bash
 node simulate_projection.mjs site/static/data/alaska-rcv-2026 site/static/data/alaska-rcv-2026/projection.json \
-  --runs 1000 --seed 20261104 --tau 0.2 --tau-local 0.28 --tau-party 0.2 --min-pool 300 --min-bucket 30
+  --runs 1000 --seed 20261104 --tau 0.2 --tau-local 0.28 --tau-party 0.2 --min-pool 300 --min-bucket 30 \
+  --shares site/static/data/alaska-rcv-2026/shares.json
 ```
 
 It takes about 70 seconds on a laptop and needs `ballots.json`, `contest-*.json`, `coverage.json`, `early-absentee-2024.json`,
@@ -290,6 +291,25 @@ A run takes 9 seconds at 100 simulations and 71 at 1,000. One ballot at a time t
 dot for each. A tied simulation is only counted. Sorting drops which simulation each share came from, but seat counts need each race's
 result from the same simulation, so `outcomes` is worked out first, and the page unpacks it to one entry per simulation. The file is
 354 KB, or 50 KB gzipped. Storing each simulation's votes and runner-up as well, for a fuller tooltip, would be 4.38 MB, or 412 KB gzipped.
+
+`--shares SHARES.json` writes, from the same simulations, each candidate's first-round share and their share in the final round
+between the last two, counted past a first-round majority as the page's rounds are. Each share is of that round's votes for
+candidates, as the page's rounds give it, and each is the 5th percentile, median and 95th percentile, to 4 decimals. Shares,
+not vote counts: the simulation expected more ballots than the final count had, which lowers every count but needn't move a share.
+
+```
+{
+  interval: 0.9,                                  // the share of simulations between the low and high numbers
+  contests: { [id]: {
+    first: { [letter]: [low, median, high] },     // every candidate on the ballot
+    last: { [letter]: [low, median, high, n] },   // over the n simulations in which they reached the final round; none if never
+  } }
+}
+```
+
+The extra count past a first-round majority draws no random numbers, so adding it left every `projection.json` byte-identical.
+`shares.json` is kept apart because only the final page's history uses it, and `build_history.mjs` copies it into `history.json`,
+which only that page downloads.
 
 ## On the page
 

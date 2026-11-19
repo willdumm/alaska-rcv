@@ -62,7 +62,7 @@ nix shell nixpkgs#nodejs nixpkgs#poppler-utils nixpkgs#unzip -c bash
    reads the questioned row from the saved table, stops if the table's total differs from `received.json`'s, and records the row
    in `coverage.json`. Uncounted ballots leave it out, because the questioned estimate already covers those ballots.
 3. `bash scripts/refresh.sh build RAW_DIR site/static/data/alaska-rcv-2026` (about 4 minutes) extracts the CVR, then rebuilds
-   `ballots.json`, the contest files, `coverage.json` and `projection.json`, using the CVR's `Last-Modified` and download time
+   `ballots.json`, the contest files, `coverage.json`, `projection.json` and `shares.json`, using the CVR's `Last-Modified` and download time
    from its saved headers. It then checks the simulation's arithmetic and the vote totals.
    Same inputs give a byte-identical `projection.json`. Once the CVR includes questioned ballots (group 4), the simulation only
    adds whatever is left of each district's expected count; revisit that then.
@@ -74,7 +74,7 @@ nix shell nixpkgs#nodejs nixpkgs#poppler-utils nixpkgs#unzip -c bash
    `node scripts/validate_2024.mjs site/static/data/alaska-rcv-2026 REPORTS/*.txt` (each report through `pdftotext -layout`).
    docs/RULES.md lists the differences to expect.
 6. `bash scripts/refresh.sh keep site/static/data/alaska-rcv-2026 site/static/data/alaska-rcv-2026` keeps this build as a version, and
-   rewrites `versions.json` and `history.json`, each version's simulated wins per contest for the final page's chart
+   rewrites `versions.json` and `history.json`, each version's simulated wins and share ranges per contest for the final page's charts
    (`build_history.mjs`). Then `bash scripts/refresh.sh archive RAW_DIR site/static/data/alaska-rcv-2026` adds the raw files' checksums to `../sources.sha256`, since the Division overwrites
    them, and prints the `gh release create` command. Add a row to `../SOURCES.md` by hand.
 7. Before deploying, `bash scripts/refresh.sh check site/static/data/alaska-rcv-2026 CACERT` runs the tests, the vote total

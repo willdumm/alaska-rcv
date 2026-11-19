@@ -5,6 +5,8 @@
 // With --hand-only it adds only the hand-counted ballots, and stops with an error unless each race's first-rank marks are
 // exactly what the simulation meant to add, write-ins included. OUT.json is then only useful for checking. This checks the
 // simulation's arithmetic, not the data: check_counts.mjs is what compares the CVR with the Division's summary.
+// With --shares SHARES.json it also writes each candidate's first-round and final-round shares across the simulations, for the
+// final page's history (build_history.mjs). They're kept out of OUT.json, which every version's page downloads.
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -18,7 +20,7 @@ import { add, binomial, everyContest, gaussian, generator, readJson } from "./li
 
 // Every value is recorded in the output and decides the result, so a bad or missing one has to stop the run.
 const NUMBERS = { runs: "integer", seed: "integer", tau: "number", "tau-local": "number", "tau-party": "number", "min-pool": "integer", "min-bucket": "integer" };
-const USAGE = "Usage: node simulate_projection.mjs DATA_DIR OUT.json --runs N --seed S --tau T --tau-local T --tau-party T --min-pool N --min-bucket N [--hand-only]";
+const USAGE = "Usage: node simulate_projection.mjs DATA_DIR OUT.json --runs N --seed S --tau T --tau-local T --tau-party T --min-pool N --min-bucket N [--hand-only] [--shares SHARES.json]";
 export function parseFlags(args) {
   const values = {};
   let handOnly = false;
@@ -241,6 +243,17 @@ function checkHandCounted(ballots, race) {
 const median = (sorted) => (sorted[(sorted.length - 1) >> 1] + sorted[sorted.length >> 1]) / 2;
 const roundedShare = (x) => Number(x.toFixed(4));
 const ascending = (a, b) => a - b;
+// Between the two nearest values, as d3.quantile does.
+const quantile = (sorted, q) => {
+  const at = (sorted.length - 1) * q, below = Math.floor(at);
+  return below + 1 < sorted.length ? sorted[below] + (sorted[below + 1] - sorted[below]) * (at - below) : sorted[below];
+};
+// The middle 90% of simulations, and their median.
+export const SHARE_INTERVAL = 0.9;
+const spread = (values) => {
+  const sorted = [...values].sort(ascending), tail = (1 - SHARE_INTERVAL) / 2;
+  return [quantile(sorted, tail), median(sorted), quantile(sorted, 1 - tail)].map(roundedShare);
+};
 
 // What the page needs from every simulation of a contest: each winner's winning share in every simulation they won, by the round
 // they won it in, smallest first. These are all the dots on the page. A tied simulation has only its count.
@@ -257,6 +270,20 @@ export function summarizeRuns(results, letters) {
   }
   const won = results.filter((r) => r.winner);
   return { winners, ties: results.length - won.length, highShare: won.length ? roundedShare(Math.max(...won.map((r) => r.share))) : 0 };
+}
+
+// Each candidate's first-round share in every simulation, and their share in the final round between the last two, as the page
+// draws it: counted past a first-round majority. Each is of that round's votes for candidates, as the page's rounds give it. A
+// candidate's final-round share is only from the simulations they reached it in, so each of those has a fourth number, how many
+// that was. A candidate who never reached it has none.
+export function summarizeShares(results, letters) {
+  const first = Object.fromEntries(letters.map((l) => [l, spread(results.map((r) => r.first[l]))]));
+  const last = {};
+  for (const l of letters) {
+    const reached = results.filter((r) => l in r.last);
+    if (reached.length) last[l] = [...spread(reached.map((r) => r.last[l])), reached.length];
+  }
+  return { first, last };
 }
 
 function simulateContest(c, world, settings) {
@@ -289,10 +316,16 @@ function simulateContest(c, world, settings) {
     const result = tabulate([...ballots].map(([p, n]) => [c.patterns[p], n]), letters);
     if (handOnly) checkHandCounted(ballots, race);
     const last = result.rounds[result.rounds.length - 1];
+    // A second count past a first-round majority draws nothing at random, so it leaves every other number as it was.
+    const headToHead = result.majorityInRoundOne ? tabulate([...ballots].map(([p, n]) => [c.patterns[p], n]), letters, [], { ignoreMajority: true }) : result;
+    const [opening] = result.rounds, closing = headToHead.rounds[headToHead.rounds.length - 1];
+    const finalists = [...letters].sort((a, b) => closing.votes[b] - closing.votes[a]).slice(0, 2);
     results.push({
       winner: result.leader,
       round: result.rounds.length,
       share: Math.max(...Object.values(last.votes)) / last.active,
+      first: Object.fromEntries(letters.map((l) => [l, opening.votes[l] / opening.active])),
+      last: Object.fromEntries(finalists.map((l) => [l, closing.votes[l] / closing.active])),
     });
   }
 
@@ -332,8 +365,8 @@ function buildChambers(contests, holdovers, coverage) {
   };
 }
 
-// What's written to projection.json. settings is what parseFlags returns.
-export function simulateProjection(dataDir, settings) {
+// What's written to projection.json, and to --shares. settings is what parseFlags returns.
+export function simulate(dataDir, settings) {
   const { runs, seed, tau, tauLocal, tauParty, minPool, minBucket } = settings;
   const load = (name) => readJson(join(dataDir, name));
   const index = load("ballots.json"), coverage = load("coverage.json"), questioned = load("questioned-2024.json");
@@ -351,16 +384,25 @@ export function simulateProjection(dataDir, settings) {
   const chambers = buildChambers(all, load("holdovers.json"), coverage);
   // Seat counts need every race's result from the same simulation, so they're worked out here, while all the results exist.
   for (const chamber of Object.values(chambers)) chamber.outcomes = outcomeRows(seatsPerRun(chamber, { parameters: { runs }, contests: simulated }));
-  const contests = Object.fromEntries(all.filter((c) => simulated[c.id]).map((c) => {
+  const ran = all.filter((c) => simulated[c.id]);
+  const contests = Object.fromEntries(ran.map((c) => {
     const { runs: results, ...rest } = simulated[c.id];
     return [c.id, { ...rest, ...summarizeRuns(results, c.candidates.map((x) => x.letter)) }];
   }));
   const parameters = { runs, seed, tau, tauLocal, tauParty, minPool, minBucket, turnoutScale: Number(turnout.scale.toFixed(3)), turnoutSdLog: Number(turnout.sdLog.toFixed(3)) };
-  return { parameters, cvrLastModified: coverage.cvrLastModified, chambers, contests };
+  const shares = { interval: SHARE_INTERVAL, contests: Object.fromEntries(ran.map((c) => [c.id, summarizeShares(simulated[c.id].runs, c.candidates.map((x) => x.letter))])) };
+  return { projection: { parameters, cvrLastModified: coverage.cvrLastModified, chambers, contests }, shares };
 }
+
+export const simulateProjection = (dataDir, settings) => simulate(dataDir, settings).projection;
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [dataDir, output, ...flags] = process.argv.slice(2);
   if (!dataDir || !output || dataDir.startsWith("--") || output.startsWith("--")) throw new Error(USAGE);
-  writeFileSync(output, `${JSON.stringify(simulateProjection(dataDir, parseFlags(flags)))}\n`);
+  const at = flags.indexOf("--shares");
+  const sharesOutput = at < 0 ? null : flags.splice(at, 2)[1];
+  if (at >= 0 && (!sharesOutput || sharesOutput.startsWith("--"))) throw new Error(USAGE);
+  const { projection, shares } = simulate(dataDir, parseFlags(flags));
+  writeFileSync(output, `${JSON.stringify(projection)}\n`);
+  if (sharesOutput) writeFileSync(sharesOutput, `${JSON.stringify(shares)}\n`);
 }

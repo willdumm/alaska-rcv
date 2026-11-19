@@ -150,6 +150,16 @@ It leaves out ballots yet to arrive, ballots the Division rejects, precincts yet
 
 {{< /rcv/details >}}
 
+{{< rcv/slot id="rcv-history-shares" class="rcv-chart" >}}
+
+{{< rcv/note id="rcv-history-shares-note" >}}{{< /rcv/note >}}
+
+{{< rcv/details id="rcv-history-shares-details" summary="Table of simulated shares, by update" >}}
+
+{{< rcv/table id="rcv-history-shares-table" >}}
+
+{{< /rcv/details >}}
+
 {{< /rcv/section >}}
 
 {{< rcv/section id="ranks-section" title="Explore ballot rankings" >}}

@@ -154,7 +154,7 @@ build() {
   rm -rf "$raw/cvr"
   "$python" -I "$here/build_coverage.py" "$raw/summary.txt" "$raw/GA_ENR_Precinct_State_of_Alaska.csv" "$data/ballots.json" \
     "$raw/received.json" "$raw/ballots-received-table.html" "$posted_at" "$fetched_at" "$data/coverage.json" ${final:+"$final"}
-  node "$here/simulate_projection.mjs" "$data" "$data/projection.json" --runs 1000 "${sim_settings[@]}"
+  node "$here/simulate_projection.mjs" "$data" "$data/projection.json" --runs 1000 "${sim_settings[@]}" --shares "$data/shares.json"
   local throwaway
   throwaway=$(mktemp)
   node "$here/simulate_projection.mjs" "$data" "$throwaway" --runs 1 "${sim_settings[@]}" --hand-only
@@ -169,16 +169,18 @@ Rebuilt from the CVR posted $posted_at. By hand, from here (scripts/README.md ha
 NEXT
 }
 
-# With the parameters the committed file records, so this can't drift from how it was made.
+# With the parameters the committed file records, so this can't drift from how it was made. shares.json comes from the same runs.
 reproduce() {
-  local data=$1 flags fresh
+  local data=$1 flags fresh shares
   flags=$(node -p "const p = JSON.parse(require('fs').readFileSync(process.argv[1])).parameters; \`--runs \${p.runs} --seed \${p.seed} --tau \${p.tau} --tau-local \${p.tauLocal} --tau-party \${p.tauParty} --min-pool \${p.minPool} --min-bucket \${p.minBucket}\`" "$data/projection.json")
   fresh=$(mktemp)
+  shares=$(mktemp)
   # shellcheck disable=SC2086
-  node "$here/simulate_projection.mjs" "$data" "$fresh" $flags
-  cmp "$fresh" "$data/projection.json" || { rm -f "$fresh"; echo "PROBLEM: projection.json isn't what the simulation makes"; return 1; }
-  rm -f "$fresh"
-  echo "projection.json reproduces."
+  node "$here/simulate_projection.mjs" "$data" "$fresh" $flags --shares "$shares"
+  cmp "$fresh" "$data/projection.json" || { rm -f "$fresh" "$shares"; echo "PROBLEM: projection.json isn't what the simulation makes"; return 1; }
+  cmp "$shares" "$data/shares.json" || { rm -f "$fresh" "$shares"; echo "PROBLEM: shares.json isn't what the simulation makes"; return 1; }
+  rm -f "$fresh" "$shares"
+  echo "projection.json and shares.json reproduce."
 }
 
 check() {

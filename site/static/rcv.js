@@ -8,7 +8,7 @@ import { $, alaskaTime, el, fmt, pct, strong, watchPointers } from "./rcv-dom.js
 import { INACTIVE_COLOR, LOW_RANKINGS, WRITE_IN_COLOR, ballotsLeft, ballotsLeftInContest, countedBallots, coverage, districtName, districtShares, districts, firstChoices, index, isFinal, knownRankings, majorityIn, ofRuns, parseStamp, placesOf, prepareContest, projection, readRanking, roundTen, setData, summaryFor, writeInsMatter } from "./rcv-model.js";
 import { renderFlow, roundStory } from "./rcv-flow.js";
 import { renderProjection } from "./rcv-projection.js";
-import { renderHistory } from "./rcv-history.js";
+import { renderHistory, renderShareHistory } from "./rcv-history.js";
 import { drawMap, paintMap, renderCoverage, renderDots, renderMapLegend, renderMapMode, setLastShares, windAllRings } from "./rcv-districts.js";
 import { actions, currentContest, state } from "./rcv-state.js";
 import { chamberContest, chamberLabel, isChamber, renderChamber } from "./rcv-seats.js";
@@ -411,8 +411,10 @@ async function draw() {
   }
 
   renderSummary(c, renderCount(c, state.hd));
-  if (isFinal()) renderHistory(c, simHistory);
-  else renderProjection(c);
+  if (isFinal()) {
+    renderHistory(c, simHistory);
+    renderShareHistory(c, simHistory);
+  } else renderProjection(c);
   $("ranks-section").hidden = Boolean(c.measure);
   if (!c.measure) renderDrill(c, ballotCounts(c, state.hd));
   renderMapMode(c);

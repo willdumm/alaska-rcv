@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { binomial, generator } from "../scripts/lib.mjs";
-import { Pool, parseFlags, simulateProjection, summarizeRuns } from "../scripts/simulate_projection.mjs";
+import { Pool, parseFlags, simulateProjection, summarizeRuns, summarizeShares } from "../scripts/simulate_projection.mjs";
 
 const data = new URL("../site/static/data/alaska-rcv-2026/", import.meta.url).pathname;
 
@@ -111,6 +111,20 @@ test("drawing at once matches drawing one ballot at a time", () => {
 });
 
 const run = (winner, round, share) => ({ winner, round, share });
+
+test("shares are the middle 90% and median of every simulation, and the final round's only of those that reached it", () => {
+  // A's first-round share runs 0.300 to 0.400; C reaches the final round in 10 simulations, B in the other 91.
+  const results = Array.from({ length: 101 }, (_, i) => ({
+    first: { A: 0.3 + i / 1000, B: 0.6 - i / 1000, C: 0.1 },
+    last: i < 10 ? { A: 0.5 + i / 1000, C: 0.5 - i / 1000 } : { A: 0.5 + i / 1000, B: 0.5 - i / 1000 },
+  }));
+  const { first, last } = summarizeShares(results, ["A", "B", "C"]);
+  assert.deepEqual(first, { A: [0.305, 0.35, 0.395], B: [0.505, 0.55, 0.595], C: [0.1, 0.1, 0.1] });
+  assert.deepEqual(last.A, [0.505, 0.55, 0.595, 101]);
+  assert.equal(last.C[3], 10);
+  assert.equal(last.B[3], 91);
+  assert.deepEqual(Object.keys(summarizeShares(results.slice(10), ["A", "B", "C"]).last), ["A", "B"]);
+});
 
 test("every win is stored by winner and round, smallest share first, however rare", () => {
   const results = [

@@ -1,6 +1,7 @@
-// How the simulations moved from one version to the next: each version's wins per candidate, for every simulated contest.
+// How the simulations moved from one version to the next: each version's wins per candidate, for every simulated contest, and
+// the median and middle range of each candidate's first-round and final-round shares.
 // Usage: node build_history.mjs DATA_DIR
-// Writes DATA_DIR/history.json from DATA_DIR/versions/*/projection.json. refresh.sh keep runs it, so it always has every version.
+// Writes DATA_DIR/history.json from DATA_DIR/versions/*/projection.json and shares.json. refresh.sh keep runs it, so it always has every version.
 // It sits beside versions.json, not in any one version, since it's about all of them.
 import { existsSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -18,22 +19,27 @@ export function buildHistory(data) {
   const oldestFirst = [...versions].reverse();
   const newest = join(data, "versions", versions[0].id);
   const contests = {};
+  let interval = null;
   for (const [i, version] of oldestFirst.entries()) {
     const dir = join(data, "versions", version.id);
     const projection = readJson(join(dir, "projection.json"));
+    const shares = readJson(join(dir, "shares.json"));
+    if ((interval ??= shares.interval) !== shares.interval) throw new Error(`version ${version.id} has shares over another range`);
     for (const [id, sim] of Object.entries(projection.contests)) {
       const names = namesOf(dir, id), newestNames = namesOf(newest, id);
       if (names && newestNames && Object.entries(names).some(([letter, name]) => newestNames[letter] !== name)) {
         throw new Error(`contest ${id}: version ${version.id} has other candidates under the same letters`);
       }
-      contests[id] ??= { wins: Array(oldestFirst.length).fill(null), ties: Array(oldestFirst.length).fill(null) };
+      contests[id] ??= { wins: Array(oldestFirst.length).fill(null), ties: Array(oldestFirst.length).fill(null), shares: Array(oldestFirst.length).fill(null) };
       contests[id].wins[i] = Object.fromEntries(Object.entries(sim.winners).map(([letter, w]) => [letter, w.wins]));
       contests[id].ties[i] = sim.ties;
+      contests[id].shares[i] = shares.contests[id];
       if (projection.parameters.runs !== readJson(join(newest, "projection.json")).parameters.runs) throw new Error(`version ${version.id} has a different number of simulations`);
     }
   }
   const history = {
     runs: readJson(join(newest, "projection.json")).parameters.runs,
+    interval,
     versions: oldestFirst.map(({ id, time, counted, final }) => ({ id, time, counted, ...(final ? { final } : {}) })),
     contests,
   };

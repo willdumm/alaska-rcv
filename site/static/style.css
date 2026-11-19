@@ -211,6 +211,8 @@ button.rcv-choice[aria-pressed="true"] { border-color: var(--heading); backgroun
 .rcv-scale .ramp i { display: block; width: 22px; height: 12px; }
 .rcv-details { margin-top: 20px; }
 .rcv-details summary { min-height: 32px; font-weight: 600; cursor: pointer; }
+#rcv-history-shares { margin-top: 32px; }
+#rcv-history-shares svg + svg { margin-top: 20px; }
 /* On a touch screen a press on a chart is a tap, and doesn't select its text or flash the mark. */
 @media (pointer: coarse) { .rcv-chart svg, #rcv-map svg { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; } }
 

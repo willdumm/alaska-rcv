@@ -83,6 +83,7 @@ test("keeping a build rebuilds its version, but won't replace one that holds oth
     const keep = (c, extra = projection("built")) => {
       writeFileSync(join(built, "coverage.json"), JSON.stringify(c));
       writeFileSync(join(built, "projection.json"), extra);
+      writeFileSync(join(built, "shares.json"), JSON.stringify({ interval: 0.9, contests: {} }));
       cpSync(join(built, "coverage.json"), join(data, "coverage.json"));
       return execFileSync(process.execPath, [script, built, data], { encoding: "utf8", stdio: "pipe" });
     };
