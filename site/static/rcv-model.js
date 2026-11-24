@@ -19,6 +19,8 @@ export const ofRuns = (count) => `${fmt(count)} of ${fmt(projection.parameters.r
 
 // The Division has counted every ballot, so there's nothing left to estimate or simulate (refresh.sh build --final).
 export const isFinal = () => Boolean(coverage.final);
+// The Division has certified them: its summary says so.
+export const isOfficial = () => isFinal() && coverage.report.status === "OFFICIAL RESULTS";
 
 export const MIDDLE = "#ece9e4";
 export const MARGIN_BREAKS = [2.5, 10, 25];

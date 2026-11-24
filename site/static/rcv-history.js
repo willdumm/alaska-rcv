@@ -57,7 +57,7 @@ export function renderHistory(c, history) {
   }
   const { runs } = history;
   const points = history.versions.map((v, i) => ({ ...v, date: new Date(v.time), wins: series.wins[i], ties: series.ties[i] })).filter((p) => p.wins);
-  const finalPoint = points.find((p) => p.final);
+  const finalPoint = points.findLast((p) => p.final);
   const simulated = points.filter((p) => !p.final);
   const winsOf = (p, l) => p.wins[l] ?? 0;
   // Everyone who won a simulation at some point, most wins at the end first.
@@ -106,7 +106,7 @@ export function renderHistory(c, history) {
   const neverWon = c.order.filter((l) => !shown.includes(l));
   table.replaceChildren(
     el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Results posted"), el("th", { scope: "col" }, "Ballots counted"), ...shown.map((l) => el("th", { scope: "col" }, c.byLetter[l].short)))),
-    el("tbody", {}, ...[...points].reverse().map((p) => el("tr", {}, el("th", { scope: "row" }, `${alaskaTime(p.date)}${p.final ? " (final count)" : ""}`), el("td", {}, fmt(p.counted)),
+    el("tbody", {}, ...[...points].reverse().map((p) => el("tr", {}, el("th", { scope: "row" }, `${alaskaTime(p.date)}${p.final ? ` (${p.official ? "official results" : "final count"})` : ""}`), el("td", {}, fmt(p.counted)),
       ...shown.map((l) => el("td", {}, p.final ? (winsOf(p, l) === runs ? "Won" : "–") : fmt(winsOf(p, l))))))),
   );
   const ties = d3.sum(simulated, (p) => p.ties ?? 0);
@@ -132,7 +132,7 @@ export function renderShareHistory(c, history) {
   if (!series?.shares) return;
   const { runs, interval } = history;
   const points = history.versions.map((v, i) => ({ ...v, date: new Date(v.time), shares: series.shares[i] })).filter((p) => p.shares);
-  const finalPoint = points.find((p) => p.final);
+  const finalPoint = points.findLast((p) => p.final);
   const simulated = points.filter((p) => !p.final);
   const last = points[points.length - 1];
   const reached = (p, l) => (p.shares.last[l]?.[3] ?? 0) >= runs * MIN_REACHED;
@@ -202,7 +202,7 @@ export function renderShareHistory(c, history) {
   table.replaceChildren(
     el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Results posted"), el("th", { scope: "col" }, "Ballots counted"),
       ...columns.map(([round, l]) => el("th", { scope: "col" }, `${c.byLetter[l].short}, ${round === "first" ? "first round" : "final round"}`)))),
-    el("tbody", {}, ...[...points].reverse().map((p) => el("tr", {}, el("th", { scope: "row" }, `${alaskaTime(p.date)}${p.final ? " (final count)" : ""}`), el("td", {}, fmt(p.counted)),
+    el("tbody", {}, ...[...points].reverse().map((p) => el("tr", {}, el("th", { scope: "row" }, `${alaskaTime(p.date)}${p.final ? ` (${p.official ? "official results" : "final count"})` : ""}`), el("td", {}, fmt(p.counted)),
       ...columns.map(([round, l]) => el("td", {}, cell(p.shares[round][l])))))),
   );
   note.append(`Each line is the median of the ${fmt(runs)} simulations at that update, and its shaded band holds the middle ${middle}% of them. A share is of the votes for candidates in that round, as this page's rounds give it. The final round is between the last two candidates, counted on past a first-round majority as this page's rounds are. A candidate's final-round line uses only the simulations they reached that round in, and is drawn only where that's at least ${fmt(runs * MIN_REACHED)} of them. Write-ins aren't drawn.`

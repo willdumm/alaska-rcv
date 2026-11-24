@@ -5,7 +5,7 @@ import { tabulate } from "./rcv-tabulate.js";
 import { ballotCounts } from "./rcv-rows.js";
 import { measureContest, measuresIn } from "./rcv-measures.js";
 import { $, alaskaTime, el, fmt, pct, strong, watchPointers } from "./rcv-dom.js";
-import { INACTIVE_COLOR, LOW_RANKINGS, WRITE_IN_COLOR, ballotsLeft, ballotsLeftInContest, countedBallots, coverage, districtName, districtShares, districts, firstChoices, index, isFinal, knownRankings, majorityIn, ofRuns, parseStamp, placesOf, prepareContest, projection, readRanking, roundTen, setData, summaryFor, writeInsMatter } from "./rcv-model.js";
+import { INACTIVE_COLOR, LOW_RANKINGS, WRITE_IN_COLOR, ballotsLeft, ballotsLeftInContest, countedBallots, coverage, districtName, districtShares, districts, firstChoices, index, isFinal, isOfficial, knownRankings, majorityIn, ofRuns, parseStamp, placesOf, prepareContest, projection, readRanking, roundTen, setData, summaryFor, writeInsMatter } from "./rcv-model.js";
 import { renderFlow, roundStory } from "./rcv-flow.js";
 import { renderProjection } from "./rcv-projection.js";
 import { renderHistory, renderShareHistory } from "./rcv-history.js";
@@ -45,7 +45,7 @@ function renderStatus() {
   updatedText = stamp?.short ?? report.stamp;
   $("rcv-updated").textContent = stamp?.long ?? report.stamp;
   $("rcv-updated-detail").textContent = isFinal()
-    ? `The Division's final count, unofficial until it's certified: all ${report.precinctsTotal} precincts and ${fmt(report.votersCast)} ballots, every one scanned. Ballots posted ${alaskaTime(new Date(cvrLastModified))}.`
+    ? `${isOfficial() ? "The Division's official results" : "The Division's final count, unofficial until it's certified"}: all ${report.precinctsTotal} precincts and ${fmt(report.votersCast)} ballots, every one scanned. Ballots posted ${alaskaTime(new Date(cvrLastModified))}.`
     : `The Division's results, with ${report.precinctsReported} of ${report.precinctsTotal} precincts and ${fmt(report.votersCast)} ballots. Scanned ballots posted ${alaskaTime(new Date(cvrLastModified))}. Ballots received as of ${received.asOf}. Last checked ${alaskaTime(new Date(fetched))}.`;
 }
 
@@ -365,7 +365,7 @@ function renderDistrictWarning() {
 }
 
 function scopeText(c) {
-  return `${earlierVersion ? "Earlier version. " : ""}${c.name}, ${state.hd === "all" ? "all districts" : districtName(state.hd)}. ${isFinal() ? "Final count, unofficial until certified" : "Preliminary and unofficial, results"} as of ${updatedText}.`;
+  return `${earlierVersion ? "Earlier version. " : ""}${c.name}, ${state.hd === "all" ? "all districts" : districtName(state.hd)}. ${isOfficial() ? "Official results" : isFinal() ? "Final count, unofficial until certified" : "Preliminary and unofficial, results"} as of ${updatedText}.`;
 }
 
 // Says so on the page, rather than leaving a half-drawn page that could be read as results.

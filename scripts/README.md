@@ -68,7 +68,7 @@ nix shell nixpkgs#nodejs nixpkgs#poppler-utils nixpkgs#unzip -c bash
    adds whatever is left of each district's expected count; revisit that then.
    Once the Division has counted every ballot and run its tabulation, add `--final`: `coverage.json` then says `"final": true`,
    nothing is left uncounted, and every simulation ends the same way. The page then shows the final count's wording and the
-   simulation history in place of the simulation. The Division's November 18, 2026 count is the final one.
+   simulation history in place of the simulation. The Division's November 18, 2026 count is the first final one, and its November 23 results are the official ones.
 4. By hand, reread the caveats in `site/content/_index.md`: they may go out of date.
 5. By hand, compare the Division's round-by-round reports, if it has posted any for this CVR:
    `node scripts/validate_2024.mjs site/static/data/alaska-rcv-2026 REPORTS/*.txt` (each report through `pdftotext -layout`).

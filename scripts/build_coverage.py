@@ -42,8 +42,9 @@ def parse_report(path):
     stamp = re.search(r"Page: 1 of \d+\s+(\S+ \S+ [AP]M)", text).group(1)
     reported = re.search(r"Precincts Reported: ([\d,]+) of ([\d,]+) \(([\d.]+)%\)", text)
     cast = re.search(r"Voters Cast: ([\d,]+) of ([\d,]+) \(([\d.]+)%\)", text)
+    status = re.search(r"\b(UN)?OFFICIAL RESULTS", text)
     report = {
-        "stamp": stamp, "status": "UNOFFICIAL RESULTS" if "UNOFFICIAL RESULTS" in text else "",
+        "stamp": stamp, "status": status.group(0) if status else "",
         "precinctsReported": number(reported.group(1)), "precinctsTotal": number(reported.group(2)),
         "precinctsPercent": float(reported.group(3)),
         "votersCast": number(cast.group(1)), "registered": number(cast.group(2)), "turnoutPercent": float(cast.group(3)),

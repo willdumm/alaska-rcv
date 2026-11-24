@@ -7,12 +7,12 @@ description: An unofficial look at Alaska's 2026 general election and its ranked
 {{< rcv/intro byline="Prepared by Will Dumm &middot; questions to [will@dummthings.dev](mailto:will@dummthings.dev?subject=Alaska%20RCV%20explorer)" repo="https://github.com/willdumm/alaska-rcv" >}}
 
 {{< rcv/notice >}}
-**Final count, unofficial until certified.** The Division of Elections has counted every ballot and run its ranked choice tabulation. It plans to certify the results on November 25. Not affiliated with the State of Alaska or the Division of Elections. [Read the caveats](#caveats).
+**Official results.** These are the Division of Elections' official results, posted November 23. Not affiliated with the State of Alaska or the Division of Elections. [Read the caveats](#caveats).
 {{< /rcv/notice >}}
 
 {{< rcv/prose id="rcv-about" >}}
 
-The Division of Elections posts the rankings on every ballot it scans. While ballots were still being counted, it had rankings only for scanned ballots and first choices for hand-counted ones, so this page estimated the ranked choice results and simulated the ballots still to come. Counting finished on November 18: the Division scanned every ballot and ran its ranked choice tabulation, and this page's count matches every number in its 15 round-by-round reports.
+The Division of Elections posts the rankings on every ballot it scans. While ballots were still being counted, it had rankings only for scanned ballots and first choices for hand-counted ones, so this page estimated the ranked choice results and simulated the ballots still to come. These are the Division's official results, posted November 23, and this page's count matches every number in its 14 official round-by-round reports.
 
 In ranked choice tabulation, if no candidate has a majority, the last-place candidate is eliminated and those ballots move to their next choice, until two candidates remain. Moving down the page:
 
@@ -185,7 +185,7 @@ Pick a first choice to see how scanned ballots ranked their next choice.
 - **Statewide races aren't decided by district.** Early and absentee ballots sit under the districts the Division's reports give them, which can differ from where voters live.
 - **Simulations weren't forecasts.** Different assumptions give different numbers.
 
-**How this was checked.** This page's count reproduces every number in all 15 of the Division's 2026 round-by-round reports, and on scanned ballots alone, all 9 of its certified 2024 reports. In Senate District C, the Division's report goes on to a second round after Stutes has a majority in round 1, where the law ends the count. The winner is the same. It also agreed with [RCTab](https://github.com/BrightSpots/rcv), a separate open source vote-counting program, on every 2024 contest and on the 2026 count posted November 4, apart from at most 21 votes in a round, all from repeated rankings. [Rules and checks](https://github.com/willdumm/alaska-rcv/blob/main/docs/RULES.md).
+**How this was checked.** This page's count reproduces every number in all 14 of the Division's official 2026 round-by-round reports, and on scanned ballots alone, all 9 of its certified 2024 reports. It also agreed with [RCTab](https://github.com/BrightSpots/rcv), a separate open source vote-counting program, on every 2024 contest and on the 2026 count posted November 4, apart from at most 21 votes in a round, all from repeated rankings. [Rules and checks](https://github.com/willdumm/alaska-rcv/blob/main/docs/RULES.md).
 
 **Sources.** The Division's [list of scanned ballots and their rankings](https://www.elections.alaska.gov/enr/26GENR/results/CVR_Export.zip) (its Cast Vote Record), [results summary](https://www.elections.alaska.gov/enr/26GENR/results/ElectionSummaryReportRPT.pdf), [results page](https://www.elections.alaska.gov/election-results/e/), [district map](https://www.elections.alaska.gov/enr/26GENR/) and [district names](https://www.elections.alaska.gov/doc/forms/H07.pdf); the same list for 2024; the U.S. Census Bureau's [state outline](https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html). Charts by [d3](https://d3js.org).
 

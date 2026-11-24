@@ -59,6 +59,7 @@ export function manifestEntry(coverage) {
     received: coverage.received.received,
     ...(coverage.received.questionedNote ? { note: coverage.received.questionedNote } : {}),
     ...(coverage.final ? { final: true } : {}),
+    ...(coverage.final && coverage.report.status === "OFFICIAL RESULTS" ? { official: true } : {}),
   };
 }
 

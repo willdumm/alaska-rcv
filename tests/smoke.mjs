@@ -26,8 +26,9 @@ const base = `http://127.0.0.1:${server.address().port}/`;
 const index = JSON.parse(readFileSync(join(root, "data/alaska-rcv-2026/ballots.json"), "utf8"));
 const projection = JSON.parse(readFileSync(join(root, "data/alaska-rcv-2026/projection.json"), "utf8"));
 // Once the Division has counted every ballot, the latest version shows the simulations' history in place of the simulation.
-const final = Boolean(JSON.parse(readFileSync(join(root, "data/alaska-rcv-2026/coverage.json"), "utf8")).final);
-const status = final ? /final count, unofficial/i : /preliminary and unofficial/i;
+const coverage = JSON.parse(readFileSync(join(root, "data/alaska-rcv-2026/coverage.json"), "utf8"));
+const final = Boolean(coverage.final);
+const status = coverage.report.status === "OFFICIAL RESULTS" ? /official results/i : final ? /final count, unofficial/i : /preliminary and unofficial/i;
 const ids = [...index.contests.map((c) => c.id), ...Object.values(index.measureIds)];
 const WIDTHS = [["phone", { width: 390, height: 844 }], ["desktop", { width: 1280, height: 900 }]];
 const problems = [];

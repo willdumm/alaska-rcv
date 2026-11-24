@@ -1,6 +1,6 @@
 // The district views: the list of districts, the coverage table, and the map.
 import { $, addPlates, el, fmt, pct, strong, withTip } from "./rcv-dom.js";
-import { MIDDLE, MARGIN_BREAKS, ballotsLeft, ballotsLeftInContest, coverage, districtBallots, districtName, districts, isFinal, isStatewide, lowCoverage, placesOf, roundTen, districtLines } from "./rcv-model.js";
+import { MIDDLE, MARGIN_BREAKS, ballotsLeft, ballotsLeftInContest, coverage, districtBallots, districtName, districts, isFinal, isOfficial, isStatewide, lowCoverage, placesOf, roundTen, districtLines } from "./rcv-model.js";
 import { senateSeatOf } from "./rcv-chambers.js";
 import { actions, currentContest as current, state } from "./rcv-state.js";
 
@@ -143,7 +143,7 @@ export function renderDots(c, shares) {
 export function renderCoverage(c, shares) {
   const rows = Object.keys(coverage.districts).map(Number).filter((hd) => hd > 0).sort((p, q) => p - q);
   const final = isFinal();
-  $("rcv-coverage-caption").textContent = `${final ? "Final count, unofficial until certified." : "Preliminary."} ${c.measure ? "Leader is yes or no, as a share of yes and no votes."
+  $("rcv-coverage-caption").textContent = `${isOfficial() ? "Official results." : final ? "Final count, unofficial until certified." : "Preliminary."} ${c.measure ? "Leader is yes or no, as a share of yes and no votes."
     : !shares ? "No leader: this contest has one candidate." : shares.mode === "final" ? `Leader is the finalist ahead, as a share of the two finalists after the${final ? "" : " projected"} ranked choice tabulation.` : "Leader is the candidate with the most first choices, as a share of all first choices, write-in or blank included."} Counted is every ballot in the district, in the Division's results.${final ? "" : " Rankings are known only for scanned ones."}`;
   $("rcv-coverage").replaceChildren(
     el("thead", {}, el("tr", {}, ...["District", "Counted", "Scanned", "Rankings known", ...(shares ? ["Leader"] : []), ...(final ? [] : ["Ballots left"])].map((t) => el("th", { scope: "col" }, t)))),

@@ -39,10 +39,10 @@ test("every version has the page's files, simulated from its own CVR", () => {
   }
 });
 
-test("the simulations' history is every version's projection, and only the newest can be the final count", () => {
+test("the simulations' history is every version's projection, and no update after a final count has ballots left", () => {
   const data = fileURLToPath(root);
   assert.equal(readFileSync(new URL("history.json", root), "utf8"), historyText(buildHistory(data)));
-  assert.ok(versions.slice(1).every((v) => !v.final));
+  assert.ok(versions.slice(versions.findIndex((v) => !v.final)).every((v) => !v.final));
 });
 
 test("a version is named for its CVR and its received table, and dated by the Division's latest change, in Alaska time", () => {

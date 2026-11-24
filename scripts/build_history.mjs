@@ -40,7 +40,7 @@ export function buildHistory(data) {
   const history = {
     runs: readJson(join(newest, "projection.json")).parameters.runs,
     interval,
-    versions: oldestFirst.map(({ id, time, counted, final }) => ({ id, time, counted, ...(final ? { final } : {}) })),
+    versions: oldestFirst.map(({ id, time, counted, final, official }) => ({ id, time, counted, ...(final ? { final } : {}), ...(official ? { official } : {}) })),
     contests,
   };
   return history;
